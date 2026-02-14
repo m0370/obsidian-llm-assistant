@@ -94,6 +94,7 @@ export class ChatView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		this.chatInput?.destroy();
 		this.contentEl.empty();
 	}
 
@@ -415,6 +416,7 @@ export class ChatView extends ItemView {
 			generatingEl.remove();
 			this.isGenerating = false;
 			this.chatInput.enable();
+			this.chatInput.focus();
 			this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
 			// 自動保存
 			await this.saveCurrentConversation();
@@ -550,7 +552,7 @@ export class ChatView extends ItemView {
 
 			// 会話にファイル内容を追加して再度LLMを呼び出す
 			const fileContentText = fileContents.join("\n\n");
-			const strippedAssistant = this.stripVaultWriteTags(this.stripVaultReadTags(assistantMsg.content));
+			const strippedAssistant = this.stripVaultReadTags(assistantMsg.content);
 			// vault_readタグ除去後に空になる場合、プレースホルダーを入れる
 			// （Gemini等、空のmodelメッセージを受け付けないプロバイダー対策）
 			const assistantContent = strippedAssistant || t("chat.readingFiles");
