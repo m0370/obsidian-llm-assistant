@@ -1,0 +1,426 @@
+/**
+ * i18n（多言語対応）モジュール
+ *
+ * 外部ライブラリ不要。翻訳データ + t() 関数を単一ファイルに集約。
+ * 対応言語: English (en), 日本語 (ja)
+ */
+
+type Locale = "en" | "ja";
+
+let currentLocale: Locale = "en";
+
+// --- 翻訳データ ---
+
+const translations: Record<Locale, Record<string, string>> = {
+	en: {
+		// Command palette
+		"command.openChat": "Open chat panel",
+
+		// Header / toolbar
+		"header.history": "History",
+		"header.settings": "Settings",
+		"header.newChat": "New chat",
+		"toolbar.attachActive": "Attach active note",
+		"toolbar.pickFile": "Select note",
+		"toolbar.copy": "Copy",
+		"toolbar.insertToNote": "Insert to note",
+
+		// Chat input
+		"input.placeholder": "Type a message...",
+		"input.send": "Send",
+
+		// Chat messages
+		"message.user": "You",
+		"message.assistant": "Assistant",
+
+		// Generating
+		"chat.generating": "Generating",
+
+		// Notices
+		"notice.noActiveNote": "No active note",
+		"notice.attached": "{name} attached",
+		"notice.alreadyAttachedOrLimit": "Already attached or token limit exceeded",
+		"notice.copied": "Copied",
+		"notice.noMessageToInsert": "No message to insert",
+		"notice.insertedToNote": "Inserted to note",
+		"notice.conversationDeleted": "Conversation deleted",
+		"notice.apiKeySaveFailed": "Failed to save API key: {message}",
+		"notice.apiKeyDeleted": "{name} API key deleted",
+		"notice.apiKeyValid": "API key is valid",
+		"notice.apiKeyInvalid": "API key is invalid",
+		"notice.apiKeyTestFailed": "API key validation failed",
+
+		// Errors
+		"error.providerNotFound": "Provider not found",
+		"error.apiKeyNotSet": "{name} API key is not set. Please enter it in Settings.",
+		"error.occurred": "An error occurred: {message}",
+
+		// Conversation
+		"conversation.title": "History",
+		"conversation.empty": "No conversation history",
+		"conversation.messages": "{count} messages",
+		"conversation.delete": "Delete",
+		"conversation.newChat": "New chat",
+
+		// Settings
+		"settings.heading": "LLM Assistant Settings",
+		"settings.language": "Language",
+		"settings.languageDesc": "Display language for the UI",
+		"settings.languageAuto": "Auto-detect",
+		"settings.provider": "LLM Provider",
+		"settings.providerDesc": "Select the LLM provider to use",
+		"settings.model": "Model",
+		"settings.modelDesc": "Select the model to use",
+		"settings.security": "Security",
+		"settings.securityAvailable": "SecretStorage API is available (recommended)",
+		"settings.securityUnavailable": "SecretStorage API is not available. Choose WebCrypto or plaintext",
+		"settings.apiKeyStorage": "API Key Storage",
+		"settings.secretStorage": "SecretStorage (Recommended)",
+		"settings.webCrypto": "WebCrypto Encryption",
+		"settings.plaintext": "Plaintext (Not recommended)",
+		"settings.plaintextWarning": "Warning: API keys are stored unencrypted in plugin data. This is a security risk.",
+		"settings.masterPassword": "Master Password",
+		"settings.masterPasswordDesc": "Used to encrypt API keys. Kept only during session",
+		"settings.masterPasswordPlaceholder": "Master password",
+		"settings.apiKeys": "API Keys",
+		"settings.apiKeyInput": "Enter {name} API key",
+		"settings.apiKeyTest": "Test",
+		"settings.apiKeyTesting": "Testing...",
+		"settings.apiKeyNotSet": "API key is not set",
+		"settings.apiKeyDelete": "Delete",
+		"settings.customEndpoint": "Custom Endpoint",
+		"settings.endpointUrl": "Endpoint URL",
+		"settings.endpointUrlDesc": "OpenAI-compatible API URL (e.g. http://localhost:8080/v1/chat/completions)",
+		"settings.modelId": "Model ID",
+		"settings.modelIdDesc": "Identifier of the model to use",
+		"settings.advanced": "Advanced Settings",
+		"settings.streaming": "Streaming Mode",
+		"settings.streamingDesc": "Show response in real-time (supported providers only)",
+		"settings.temperature": "Temperature",
+		"settings.temperatureDesc": "Creativity of generation (0.0=deterministic, 1.0=creative)",
+		"settings.preset": "Preset",
+		"settings.presetDesc": "Frequently used system prompt templates",
+		"settings.systemPrompt": "System Prompt",
+		"settings.systemPromptDesc": "Set default instructions to the LLM (can be overridden by presets)",
+		"settings.systemPromptPlaceholder": "(e.g.) You are a helpful assistant.",
+
+		// Quick actions
+		"quickAction.summarize": "Summarize",
+		"quickAction.summarize.prompt": "Please summarize the following text concisely:\n\n",
+		"quickAction.translateEn": "Translate to English",
+		"quickAction.translateEn.prompt": "Please translate the following text to English:\n\n",
+		"quickAction.translateJa": "Translate to Japanese",
+		"quickAction.translateJa.prompt": "Please translate the following text to Japanese:\n\n",
+		"quickAction.proofread": "Proofread",
+		"quickAction.proofread.prompt": "Please proofread the following text and explain corrections:\n\n",
+		"quickAction.explain": "Explain",
+		"quickAction.explain.prompt": "Please explain the following text clearly:\n\n",
+		"quickAction.expand": "Expand",
+		"quickAction.expand.prompt": "Please expand and elaborate on the following text:\n\n",
+
+		// Presets
+		"preset.default": "Default",
+		"preset.default.prompt": "",
+		"preset.politeJa": "Polite Japanese Assistant",
+		"preset.politeJa.prompt": "You are an assistant that answers politely in Japanese.",
+		"preset.technical": "Technical Writer",
+		"preset.technical.prompt": "You are an assistant specialized in writing technical documentation. Be precise and concise.",
+		"preset.creative": "Creative Writer",
+		"preset.creative.prompt": "You are an assistant that helps with creative writing. Use engaging expressions.",
+		"preset.translator": "Translator",
+		"preset.translator.prompt": "You are a professional translator. Create natural translations while preserving the nuance of the original text.",
+		"preset.codeReviewer": "Code Reviewer",
+		"preset.codeReviewer.prompt": "You are a software engineering expert. Review code from quality, performance, and security perspectives.",
+
+		// Provider / model labels
+		"provider.ollama": "Ollama (Local)",
+		"provider.custom": "Custom Endpoint",
+
+		// Note context
+		"context.header": "The following notes are referenced from the user's Obsidian Vault:",
+		"context.activeNote": "Currently open note:",
+		"context.vaultFiles": "Files in vault (user can reference any file using [[filename]] in their message and its content will be automatically loaded):",
+		"context.linkedFiles": "Referenced notes from user's message:",
+
+		// File picker
+		"filePicker.placeholder": "Search notes...",
+
+		// Message editing
+		"message.edit": "Edit",
+
+		// API key URLs
+		"settings.apiKeyUrl": "Get API key: {url}",
+		"error.apiKeyNotSetWithUrl": "{name} API key is not set. Get your key at: {url}",
+
+		// Font size
+		"settings.fontSize": "Font Size",
+		"settings.fontSizeDesc": "Adjust the font size of the chat interface",
+		"settings.fontSizeSmall": "Small",
+		"settings.fontSizeMedium": "Medium (Default)",
+		"settings.fontSizeLarge": "Large",
+
+		// Vault file reading
+		"context.vaultReadInstruction": "IMPORTANT: You can read the content of any file in the user's vault. To read a file, include <vault_read>filepath</vault_read> in your response (e.g. <vault_read>Notes/my-note.md</vault_read>). The system will automatically provide the file content and you can then answer based on it. Use this whenever the user asks about a specific note or you need to look up file contents.\n\nWhen you reference vault files in your response, ALWAYS use the [[filename]] wikilink format (e.g. [[My Note]] or [[folder/My Note]]). These will become clickable links that open the file directly in Obsidian. When you read a file using vault_read, mention which file(s) you referenced in your answer (e.g. \"Based on [[My Note]], ...\").",
+		"context.vaultWriteInstruction": "FILE EDITING: When the user asks you to edit, modify, rewrite, fix typos, proofread, reformat, or create a file, you MUST use the vault_write tag to propose changes. Format: <vault_write path=\"filepath\">entire new file content here</vault_write>. ALWAYS read the file first with vault_read to get the current content, then output the full modified content inside vault_write. The user will see a diff of your changes and can approve or dismiss them. You can edit existing files or create new ones. Use this for: writing/editing blog posts, fixing typos, reformatting text into lists or tables, translating content, expanding or summarizing sections, reorganizing structure, and any text transformation the user requests.",
+		"context.fileContentsProvided": "Here are the file contents you requested:",
+		"chat.readingFiles": "Reading files from vault...",
+
+		// Edit proposals
+		"edit.newFile": "New file",
+		"edit.modified": "Modified",
+		"edit.apply": "Apply",
+		"edit.applied": "Applied",
+		"edit.dismiss": "Dismiss",
+		"edit.dismissed": "Dismissed",
+		"edit.noChanges": "(No changes detected)",
+		"edit.chunk": "Chunk",
+		"edit.applyAll": "Apply All",
+		"edit.revertAll": "Revert All",
+		"edit.undo": "Undo",
+		"edit.undoFailed": "Could not undo — file may have been modified externally",
+		"edit.matchNotFound": "Could not find matching text in file",
+		"notice.fileEdited": "{name} has been updated",
+		"notice.fileCreated": "{name} has been created",
+		"notice.fileReverted": "{name} has been reverted",
+	},
+
+	ja: {
+		// Command palette
+		"command.openChat": "チャットパネルを開く",
+
+		// Header / toolbar
+		"header.history": "会話履歴",
+		"header.settings": "設定",
+		"header.newChat": "新規チャット",
+		"toolbar.attachActive": "アクティブノートを添付",
+		"toolbar.pickFile": "ノートを選択",
+		"toolbar.copy": "コピー",
+		"toolbar.insertToNote": "ノートに挿入",
+
+		// Chat input
+		"input.placeholder": "メッセージを入力...",
+		"input.send": "送信",
+
+		// Chat messages
+		"message.user": "You",
+		"message.assistant": "Assistant",
+
+		// Generating
+		"chat.generating": "生成中",
+
+		// Notices
+		"notice.noActiveNote": "アクティブなノートがありません",
+		"notice.attached": "{name} を添付しました",
+		"notice.alreadyAttachedOrLimit": "既に添付済みか、トークン上限を超えています",
+		"notice.copied": "コピーしました",
+		"notice.noMessageToInsert": "挿入するメッセージがありません",
+		"notice.insertedToNote": "ノートに挿入しました",
+		"notice.conversationDeleted": "会話を削除しました",
+		"notice.apiKeySaveFailed": "API鍵の保存に失敗: {message}",
+		"notice.apiKeyDeleted": "{name} のAPIキーを削除しました",
+		"notice.apiKeyValid": "APIキーは有効です",
+		"notice.apiKeyInvalid": "APIキーが無効です",
+		"notice.apiKeyTestFailed": "APIキーの検証に失敗しました",
+
+		// Errors
+		"error.providerNotFound": "プロバイダーが見つかりません",
+		"error.apiKeyNotSet": "{name} のAPIキーが設定されていません。設定画面からAPIキーを入力してください。",
+		"error.occurred": "エラーが発生しました: {message}",
+
+		// Conversation
+		"conversation.title": "会話履歴",
+		"conversation.empty": "会話履歴がありません",
+		"conversation.messages": "{count}メッセージ",
+		"conversation.delete": "削除",
+		"conversation.newChat": "新しいチャット",
+
+		// Settings
+		"settings.heading": "LLM Assistant 設定",
+		"settings.language": "言語 / Language",
+		"settings.languageDesc": "UIの表示言語",
+		"settings.languageAuto": "自動検出 (Auto)",
+		"settings.provider": "LLMプロバイダー",
+		"settings.providerDesc": "使用するLLMプロバイダーを選択",
+		"settings.model": "モデル",
+		"settings.modelDesc": "使用するモデルを選択",
+		"settings.security": "セキュリティ",
+		"settings.securityAvailable": "SecretStorage APIが利用可能です（推奨）",
+		"settings.securityUnavailable": "SecretStorage APIは利用できません。WebCryptoまたは平文を選択してください",
+		"settings.apiKeyStorage": "API鍵の保存方式",
+		"settings.secretStorage": "SecretStorage (推奨)",
+		"settings.webCrypto": "WebCrypto暗号化",
+		"settings.plaintext": "平文保存 (非推奨)",
+		"settings.plaintextWarning": "警告: API鍵が暗号化されずにプラグインデータに保存されます。セキュリティリスクがあります。",
+		"settings.masterPassword": "マスターパスワード",
+		"settings.masterPasswordDesc": "API鍵の暗号化に使用。セッション中のみ保持されます",
+		"settings.masterPasswordPlaceholder": "マスターパスワード",
+		"settings.apiKeys": "API キー",
+		"settings.apiKeyInput": "{name} のAPIキーを入力",
+		"settings.apiKeyTest": "テスト",
+		"settings.apiKeyTesting": "検証中...",
+		"settings.apiKeyNotSet": "APIキーが設定されていません",
+		"settings.apiKeyDelete": "削除",
+		"settings.customEndpoint": "カスタムエンドポイント",
+		"settings.endpointUrl": "エンドポイントURL",
+		"settings.endpointUrlDesc": "OpenAI互換APIのURL（例: http://localhost:8080/v1/chat/completions）",
+		"settings.modelId": "モデルID",
+		"settings.modelIdDesc": "使用するモデルの識別子",
+		"settings.advanced": "詳細設定",
+		"settings.streaming": "ストリーミングモード",
+		"settings.streamingDesc": "レスポンスをリアルタイムで表示（対応プロバイダーのみ）",
+		"settings.temperature": "Temperature",
+		"settings.temperatureDesc": "生成の創造性（0.0=確定的、1.0=創造的）",
+		"settings.preset": "プリセット",
+		"settings.presetDesc": "よく使うシステムプロンプトのテンプレート",
+		"settings.systemPrompt": "システムプロンプト",
+		"settings.systemPromptDesc": "LLMへのデフォルト指示を設定（プリセット選択で上書き可能）",
+		"settings.systemPromptPlaceholder": "（例）あなたは日本語で丁寧に回答するアシスタントです。",
+
+		// Quick actions
+		"quickAction.summarize": "要約する",
+		"quickAction.summarize.prompt": "以下のテキストを簡潔に要約してください:\n\n",
+		"quickAction.translateEn": "英語に翻訳",
+		"quickAction.translateEn.prompt": "以下のテキストを英語に翻訳してください:\n\n",
+		"quickAction.translateJa": "日本語に翻訳",
+		"quickAction.translateJa.prompt": "以下のテキストを日本語に翻訳してください:\n\n",
+		"quickAction.proofread": "校正する",
+		"quickAction.proofread.prompt": "以下のテキストを校正し、修正点を説明してください:\n\n",
+		"quickAction.explain": "解説する",
+		"quickAction.explain.prompt": "以下のテキストをわかりやすく解説してください:\n\n",
+		"quickAction.expand": "詳しく書く",
+		"quickAction.expand.prompt": "以下のテキストをより詳しく展開して書いてください:\n\n",
+
+		// Presets
+		"preset.default": "デフォルト",
+		"preset.default.prompt": "",
+		"preset.politeJa": "丁寧な日本語アシスタント",
+		"preset.politeJa.prompt": "あなたは日本語で丁寧に回答するアシスタントです。",
+		"preset.technical": "テクニカルライター",
+		"preset.technical.prompt": "あなたは技術文書の執筆を専門とするアシスタントです。正確で簡潔な説明を心がけてください。",
+		"preset.creative": "クリエイティブライター",
+		"preset.creative.prompt": "あなたは創造的な文章作成を支援するアシスタントです。読者を引き込む表現を使ってください。",
+		"preset.translator": "翻訳者",
+		"preset.translator.prompt": "あなたはプロの翻訳者です。原文のニュアンスを保ちつつ、自然な訳文を作成してください。",
+		"preset.codeReviewer": "コードレビュアー",
+		"preset.codeReviewer.prompt": "あなたはソフトウェアエンジニアリングの専門家です。コードの品質、パフォーマンス、セキュリティの観点からレビューしてください。",
+
+		// Provider / model labels
+		"provider.ollama": "Ollama (ローカル)",
+		"provider.custom": "カスタムエンドポイント",
+
+		// Note context
+		"context.header": "以下はユーザーのObsidian Vaultから参照されたノートです:",
+		"context.activeNote": "現在開いているノート:",
+		"context.vaultFiles": "Vault内のファイル一覧（ユーザーはメッセージ中に[[ファイル名]]と書くことで、そのファイルの内容が自動的に読み込まれます）:",
+		"context.linkedFiles": "ユーザーのメッセージから参照されたノート:",
+
+		// File picker
+		"filePicker.placeholder": "ノートを検索...",
+
+		// Message editing
+		"message.edit": "編集",
+
+		// API key URLs
+		"settings.apiKeyUrl": "APIキー取得: {url}",
+		"error.apiKeyNotSetWithUrl": "{name} のAPIキーが設定されていません。こちらから取得: {url}",
+
+		// Font size
+		"settings.fontSize": "フォントサイズ",
+		"settings.fontSizeDesc": "チャット画面のフォントサイズを調整",
+		"settings.fontSizeSmall": "小",
+		"settings.fontSizeMedium": "中（デフォルト）",
+		"settings.fontSizeLarge": "大",
+
+		// Vault file reading
+		"context.vaultReadInstruction": "重要: ユーザーのVault内のファイルの内容を読み取ることができます。ファイルを読むには、応答に<vault_read>ファイルパス</vault_read>を含めてください（例: <vault_read>Notes/my-note.md</vault_read>）。システムが自動的にファイル内容を取得し、それに基づいて回答できます。ユーザーが特定のノートについて質問したり、ファイル内容を確認する必要がある場合に使用してください。\n\n回答中でVault内のファイルに言及する場合は、必ず[[ファイル名]]のwikilink形式を使ってください（例: [[私のノート]] や [[フォルダ/私のノート]]）。これらはObsidianで直接ファイルを開けるクリック可能なリンクになります。vault_readでファイルを読んだ場合は、回答の中でどのファイルを参照したかを明示してください（例: 「[[私のノート]]の内容によると…」）。",
+		"context.vaultWriteInstruction": "ファイル編集: ユーザーがファイルの編集、修正、書き直し、誤字脱字の修正、校正、整形、作成を依頼した場合、必ずvault_writeタグで変更を提案してください。形式: <vault_write path=\"ファイルパス\">ファイルの全内容</vault_write>。必ず最初にvault_readでファイルの現在の内容を読み取り、その後修正した全内容をvault_writeで出力してください。ユーザーには変更の差分が表示され、適用または却下を選択できます。既存ファイルの編集と新規ファイルの作成の両方が可能です。用途: ブログ記事の執筆・編集、誤字脱字の修正、テキストの箇条書きや表形式への整形、翻訳、セクションの拡張や要約、構造の再構成、その他ユーザーが依頼するあらゆるテキスト変換。",
+		"context.fileContentsProvided": "リクエストされたファイルの内容です:",
+		"chat.readingFiles": "Vaultからファイルを読み込み中...",
+
+		// Edit proposals
+		"edit.newFile": "新規ファイル",
+		"edit.modified": "変更あり",
+		"edit.apply": "適用",
+		"edit.applied": "適用済み",
+		"edit.dismiss": "却下",
+		"edit.dismissed": "却下済み",
+		"edit.noChanges": "（変更なし）",
+		"edit.chunk": "チャンク",
+		"edit.applyAll": "すべて適用",
+		"edit.revertAll": "すべて元に戻す",
+		"edit.undo": "元に戻す",
+		"edit.undoFailed": "元に戻せませんでした（ファイルが外部で変更された可能性があります）",
+		"edit.matchNotFound": "ファイル内に一致するテキストが見つかりません",
+		"notice.fileEdited": "{name} を更新しました",
+		"notice.fileCreated": "{name} を作成しました",
+		"notice.fileReverted": "{name} を元に戻しました",
+	},
+};
+
+// --- API ---
+
+/**
+ * 翻訳テキストを取得
+ * @param key ドット区切りの翻訳キー
+ * @param params プレースホルダー置換用パラメータ（{name}, {count} 等）
+ */
+export function t(key: string, params?: Record<string, string | number>): string {
+	let text = translations[currentLocale][key] ?? translations.en[key] ?? key;
+
+	if (params) {
+		for (const [k, v] of Object.entries(params)) {
+			text = text.replace(`{${k}}`, String(v));
+		}
+	}
+
+	return text;
+}
+
+/**
+ * 現在のロケールを設定
+ */
+export function setLocale(locale: Locale): void {
+	currentLocale = locale;
+}
+
+/**
+ * 現在のロケールを取得
+ */
+export function getLocale(): Locale {
+	return currentLocale;
+}
+
+/**
+ * ユーザー環境からロケールを自動検出
+ * moment.locale() → navigator.language → "en"
+ */
+export function detectLocale(): Locale {
+	try {
+		// Obsidian は moment.js をグローバルに公開
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const momentLocale = (window as any).moment?.locale?.();
+		if (typeof momentLocale === "string" && momentLocale.startsWith("ja")) {
+			return "ja";
+		}
+	} catch {
+		// ignore
+	}
+
+	try {
+		if (navigator.language.startsWith("ja")) {
+			return "ja";
+		}
+	} catch {
+		// ignore
+	}
+
+	return "en";
+}
+
+/**
+ * 設定値("auto" | "en" | "ja")から実際のロケールを解決
+ */
+export function resolveLocale(setting: "auto" | "en" | "ja"): Locale {
+	if (setting === "auto") return detectLocale();
+	return setting;
+}
