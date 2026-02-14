@@ -654,7 +654,7 @@ export class ChatView extends ItemView {
 
 		// 既存ファイル: diff → チャンク分割
 		const currentContent = await this.plugin.vaultReader.cachedReadFile(file);
-		const rawDiff = this.computeDiff(currentContent, op.content);
+		const rawDiff = await this.computeDiff(currentContent, op.content);
 		const hunks = this.extractEditHunks(rawDiff);
 
 		if (hunks.length === 0) {
@@ -854,9 +854,9 @@ export class ChatView extends ItemView {
 	}
 
 	/**
-	 * 行レベルのdiffを計算（LCSベース）
+	 * 行レベルのdiffを計算（LCSベース、非同期でUIブロック回避）
 	 */
-	private computeDiff(oldText: string, newText: string): Array<{type: "same" | "add" | "remove", line: string}> {
+	private async computeDiff(oldText: string, newText: string): Promise<Array<{type: "same" | "add" | "remove", line: string}>> {
 		const oldLines = oldText.split("\n");
 		const newLines = newText.split("\n");
 		const m = oldLines.length;
@@ -867,9 +867,12 @@ export class ChatView extends ItemView {
 			return newLines.map(line => ({ type: "add" as const, line }));
 		}
 
-		// LCSテーブル構築
+		// LCSテーブル構築（100行ごとにイベントループに制御を戻す）
 		const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
 		for (let i = 1; i <= m; i++) {
+			if (i % 100 === 0) {
+				await new Promise(resolve => setTimeout(resolve, 0));
+			}
 			for (let j = 1; j <= n; j++) {
 				if (oldLines[i - 1] === newLines[j - 1]) {
 					dp[i][j] = dp[i - 1][j - 1] + 1;
