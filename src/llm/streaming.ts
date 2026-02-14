@@ -88,6 +88,7 @@ async function streamWithFetch(
 	const decoder = new TextDecoder();
 	let fullContent = "";
 	let buffer = "";
+	let jsonBuffer = ""; // 不完全JSONのリカバリバッファ
 
 	try {
 		while (true) {
@@ -102,18 +103,51 @@ async function streamWithFetch(
 			for (const line of lines) {
 				const trimmed = line.trim();
 				if (!trimmed || trimmed === "data: [DONE]") continue;
-				if (!trimmed.startsWith("data: ")) continue;
 
-				try {
-					const json = JSON.parse(trimmed.slice(6));
-					const token = extractTokenFromSSE(json, provider.id);
-					if (token) {
-						fullContent += token;
-						onToken(token);
+				if (trimmed.startsWith("data: ")) {
+					// 新しい data: 行 → jsonBuffer と結合してパース試行
+					const jsonStr = jsonBuffer ? jsonBuffer + trimmed.slice(6) : trimmed.slice(6);
+					try {
+						const json = JSON.parse(jsonStr);
+						jsonBuffer = ""; // パース成功 → バッファクリア
+						const token = extractTokenFromSSE(json, provider.id);
+						if (token) {
+							fullContent += token;
+							onToken(token);
+						}
+					} catch {
+						// パース失敗: 不完全なJSON → バッファに蓄積して次行で再試行
+						jsonBuffer = jsonStr;
 					}
-				} catch {
-					// JSON解析失敗は無視（不完全なチャンクの可能性）
+				} else if (jsonBuffer) {
+					// data: プレフィックスなし行 → 前のJSONの続きとして結合
+					const jsonStr = jsonBuffer + trimmed;
+					try {
+						const json = JSON.parse(jsonStr);
+						jsonBuffer = "";
+						const token = extractTokenFromSSE(json, provider.id);
+						if (token) {
+							fullContent += token;
+							onToken(token);
+						}
+					} catch {
+						jsonBuffer = jsonStr;
+					}
 				}
+			}
+		}
+
+		// ストリーム終了後: 残ったバッファの最終パース試行
+		if (jsonBuffer) {
+			try {
+				const json = JSON.parse(jsonBuffer);
+				const token = extractTokenFromSSE(json, provider.id);
+				if (token) {
+					fullContent += token;
+					onToken(token);
+				}
+			} catch {
+				// 最終的にパース不能なデータは破棄
 			}
 		}
 	} finally {
