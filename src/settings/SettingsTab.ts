@@ -89,7 +89,6 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			.addDropdown((dropdown) => {
 				dropdown.addOption("secretstorage", t("settings.secretStorage"));
 				dropdown.addOption("webcrypto", t("settings.webCrypto"));
-				dropdown.addOption("plaintext", t("settings.plaintext"));
 				dropdown.setValue(this.plugin.settings.securityLevel);
 				dropdown.onChange(async (value) => {
 					this.plugin.settings.securityLevel = value as SecurityLevel;
@@ -98,13 +97,6 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					this.display();
 				});
 			});
-
-		// 平文保存の警告
-		if (this.plugin.settings.securityLevel === "plaintext") {
-			const warning = containerEl.createDiv({ cls: "llm-security-warning" });
-			warning.textContent = t("settings.plaintextWarning");
-			warning.style.cssText = "color: var(--text-error); background: rgba(255,0,0,0.1); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px;";
-		}
 
 		// WebCrypto用マスターパスワード
 		if (this.plugin.settings.securityLevel === "webcrypto") {
