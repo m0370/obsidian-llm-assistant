@@ -425,50 +425,57 @@ export class ChatView extends ItemView {
 	 * システムプロンプトを構築（コンテキスト、アクティブノート、wikilink、Vault一覧を含む）
 	 */
 	private async buildSystemPrompt(userText: string): Promise<string> {
-		let systemPrompt = this.plugin.settings.systemPrompt || "";
+		const parts: string[] = [];
 
-		// コンテキスト（添付ノート）
-		const contextText = this.noteContext.buildContextText();
-		if (contextText) {
-			systemPrompt = systemPrompt
-				? `${systemPrompt}\n\n${contextText}`
-				: contextText;
+		// 1. ユーザーのカスタムシステムプロンプト
+		if (this.plugin.settings.systemPrompt) {
+			parts.push(this.plugin.settings.systemPrompt);
 		}
 
-		// アクティブノートを自動取得（手動添付済みの場合は重複回避）
-		const activeFile = this.plugin.vaultReader.getActiveFile();
+		// 2. ファイル読み込み・編集機能の指示（先頭近くに配置してLLMが確実に認識）
+		parts.push(t("context.vaultReadInstruction"));
+		parts.push(t("context.vaultWriteInstruction"));
+
+		// 3. Vault全体のファイル一覧（コンパクト化: 最大200件）
+		const vaultFiles = this.plugin.vaultReader.getVaultFileList(200);
+		if (vaultFiles.length > 0) {
+			const fileList = vaultFiles.join("\n");
+			parts.push(`${t("context.vaultFiles")}\n${fileList}`);
+		}
+
+		// 4. コンテキスト（手動添付ノート）
+		const contextText = this.noteContext.buildContextText();
+		if (contextText) {
+			parts.push(contextText);
+		}
+
+		// 5. アクティブノートを自動取得（手動添付済みの場合は重複回避）
+		// モバイルではチャットパネルがアクティブになるため、最近開いたMarkdownファイルでフォールバック
+		let activeFile = this.plugin.vaultReader.getActiveFile();
+		if (!activeFile) {
+			activeFile = this.plugin.vaultReader.getMostRecentLeafFile(this.app);
+		}
 		if (activeFile) {
 			const alreadyAttached = this.noteContext.getEntries().some(
-				e => e.file.path === activeFile.path
+				e => e.file.path === activeFile!.path
 			);
 			if (!alreadyAttached) {
 				const content = await this.plugin.vaultReader.cachedReadFile(activeFile);
-				systemPrompt += `\n\n${t("context.activeNote")}\n--- ${activeFile.name} (${activeFile.path}) ---\n${content}`;
+				parts.push(`${t("context.activeNote")}\n--- ${activeFile.name} (${activeFile.path}) ---\n${content}`);
 			}
 		}
 
-		// ユーザーメッセージ中の[[wikilink]]を検出し、ファイル内容を自動取得
+		// 6. ユーザーメッセージ中の[[wikilink]]を検出し、ファイル内容を自動取得
 		const linkedFiles = await this.plugin.vaultReader.resolveWikiLinksInText(userText);
 		for (const linked of linkedFiles) {
 			const alreadyInContext = this.noteContext.getEntries().some(e => e.file.path === linked.path);
 			const isActiveFile = activeFile && activeFile.path === linked.path;
 			if (!alreadyInContext && !isActiveFile) {
-				systemPrompt += `\n\n--- ${linked.name} (${linked.path}) ---\n${linked.content}`;
+				parts.push(`--- ${linked.name} (${linked.path}) ---\n${linked.content}`);
 			}
 		}
 
-		// Vault全体のファイル一覧
-		const vaultFiles = this.plugin.vaultReader.getVaultFileList();
-		if (vaultFiles.length > 0) {
-			const fileList = vaultFiles.join("\n");
-			systemPrompt += `\n\n${t("context.vaultFiles")}\n${fileList}`;
-		}
-
-		// ファイル読み込み・編集機能の説明をLLMに追加
-		systemPrompt += `\n\n${t("context.vaultReadInstruction")}`;
-		systemPrompt += `\n\n${t("context.vaultWriteInstruction")}`;
-
-		return systemPrompt;
+		return parts.join("\n\n");
 	}
 
 	/**
@@ -543,9 +550,13 @@ export class ChatView extends ItemView {
 
 			// 会話にファイル内容を追加して再度LLMを呼び出す
 			const fileContentText = fileContents.join("\n\n");
+			const strippedAssistant = this.stripVaultWriteTags(this.stripVaultReadTags(assistantMsg.content));
+			// vault_readタグ除去後に空になる場合、プレースホルダーを入れる
+			// （Gemini等、空のmodelメッセージを受け付けないプロバイダー対策）
+			const assistantContent = strippedAssistant || t("chat.readingFiles");
 			currentMessages = [
 				...currentMessages,
-				{ role: "assistant" as const, content: this.stripVaultWriteTags(this.stripVaultReadTags(assistantMsg.content)) },
+				{ role: "assistant" as const, content: assistantContent },
 				{ role: "user" as const, content: `${t("context.fileContentsProvided")}\n\n${fileContentText}` },
 			];
 		}
