@@ -1,0 +1,23 @@
+# ビルド成果物（GitHub Releasesで配布）
+main.js
+*.js.map
+
+# 依存関係
+node_modules/
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+
+# 環境変数
+.env
+.env.local
+
+# エディタ設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# テストカバレッジ
+coverage/

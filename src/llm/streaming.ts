@@ -1,0 +1,280 @@
+import { requestUrl, Platform } from "obsidian";
+import type { LLMProvider, ChatRequest, ChatResponse } from "./LLMProvider";
+import type { GeminiProvider } from "./GeminiProvider";
+
+/**
+ * GeminiプロバイダーかどうかをチェックするType Guard
+ */
+function isGeminiProvider(provider: LLMProvider): provider is GeminiProvider & LLMProvider {
+	return provider.id === "gemini";
+}
+
+/**
+ * プロバイダーのAPIエンドポイントURLを取得
+ * Geminiの場合はモデルとAPIキーをURLに含める特殊処理
+ */
+function getEndpointUrl(provider: LLMProvider, params: ChatRequest, apiKey: string, stream: boolean): string {
+	if (isGeminiProvider(provider)) {
+		return (provider as GeminiProvider & { getEndpointUrl: (model: string, apiKey: string, stream: boolean) => string }).getEndpointUrl(params.model, apiKey, stream);
+	}
+	return provider.apiEndpoint;
+}
+
+/**
+ * プラットフォームとプロバイダーに応じた通信方式を自動選択し、
+ * LLMにリクエストを送信する統合関数。
+ *
+ * ストリーミング判定ロジック:
+ *   デスクトップ + CORS対応 → fetch() SSE
+ *   モバイル + CORS対応 → fetch()試行 → 失敗時requestUrl()
+ *   CORS非対応（Anthropic等）→ 常にrequestUrl()一括受信
+ */
+export async function sendRequest(
+	provider: LLMProvider,
+	params: ChatRequest,
+	apiKey: string,
+	onToken?: (token: string) => void,
+): Promise<ChatResponse> {
+	const trimmedKey = apiKey.trim();
+	const wantStream = params.stream !== false && onToken !== undefined;
+
+	if (wantStream && provider.supportsCORS) {
+		if (Platform.isDesktop) {
+			// デスクトップ + CORS対応 → fetch() SSE
+			return streamWithFetch(provider, params, trimmedKey, onToken);
+		}
+		// モバイル + CORS対応 → fetch()試行 → フォールバック
+		try {
+			return await streamWithFetch(provider, params, trimmedKey, onToken);
+		} catch {
+			// CORSエラー等で失敗 → requestUrl()フォールバック
+			return completeWithRequestUrl(provider, params, trimmedKey, onToken);
+		}
+	}
+
+	// CORS非対応 or ストリーミング不要 → requestUrl()一括受信
+	return completeWithRequestUrl(provider, params, trimmedKey, onToken);
+}
+
+/**
+ * fetch() SSEストリーミング
+ */
+async function streamWithFetch(
+	provider: LLMProvider,
+	params: ChatRequest,
+	apiKey: string,
+	onToken: (token: string) => void,
+): Promise<ChatResponse> {
+	const body = provider.buildRequestBody({ ...params, stream: true });
+	const headers = provider.buildHeaders(apiKey);
+	const url = getEndpointUrl(provider, params, apiKey, true);
+
+	const response = await fetch(url, {
+		method: "POST",
+		headers: { ...headers, "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		throw new Error(`API Error (${response.status}): ${errorText}`);
+	}
+
+	if (!response.body) {
+		throw new Error("Response body is null - streaming not supported");
+	}
+
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	let fullContent = "";
+	let buffer = "";
+
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			// 最後の不完全な行をバッファに保持
+			buffer = lines.pop() || "";
+
+			for (const line of lines) {
+				const trimmed = line.trim();
+				if (!trimmed || trimmed === "data: [DONE]") continue;
+				if (!trimmed.startsWith("data: ")) continue;
+
+				try {
+					const json = JSON.parse(trimmed.slice(6));
+					const token = extractTokenFromSSE(json, provider.id);
+					if (token) {
+						fullContent += token;
+						onToken(token);
+					}
+				} catch {
+					// JSON解析失敗は無視（不完全なチャンクの可能性）
+				}
+			}
+		}
+	} finally {
+		reader.releaseLock();
+	}
+
+	return {
+		content: fullContent,
+		model: params.model,
+	};
+}
+
+/**
+ * requestUrl()による一括受信 + 段階描画
+ */
+async function completeWithRequestUrl(
+	provider: LLMProvider,
+	params: ChatRequest,
+	apiKey: string,
+	onToken?: (token: string) => void,
+): Promise<ChatResponse> {
+	const body = provider.buildRequestBody({ ...params, stream: false });
+	const headers = provider.buildHeaders(apiKey);
+	const url = getEndpointUrl(provider, params, apiKey, false);
+
+	const response = await requestUrl({
+		url,
+		method: "POST",
+		headers: { ...headers, "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+
+	if (response.status !== 200) {
+		throw new Error(`API Error (${response.status}): ${response.text}`);
+	}
+
+	let result: ChatResponse;
+	if (provider.id === "anthropic") {
+		result = parseAnthropicResponse(response.json);
+	} else if (provider.id === "gemini") {
+		result = parseGeminiResponse(response.json);
+	} else {
+		// OpenAI, OpenRouter, Ollama, Custom — all use OpenAI format
+		result = parseOpenAIResponse(response.json);
+	}
+
+	// 段階描画: 受信テキストをチャンク分割して段階的に描画
+	if (onToken && result.content) {
+		await simulateStreaming(result.content, onToken);
+	}
+
+	return result;
+}
+
+/**
+ * 段階描画: 一括受信テキストをチャンク分割し、タイピングアニメーション風に描画
+ */
+async function simulateStreaming(
+	text: string,
+	onToken: (token: string) => void,
+	chunkSize = 50,
+	delayMs = 30,
+): Promise<void> {
+	for (let i = 0; i < text.length; i += chunkSize) {
+		const chunk = text.substring(i, i + chunkSize);
+		onToken(chunk);
+		if (i + chunkSize < text.length) {
+			await sleep(delayMs);
+		}
+	}
+}
+
+/**
+ * SSEレスポンスからトークンを抽出（プロバイダー別）
+ */
+function extractTokenFromSSE(json: Record<string, unknown>, providerId: string): string {
+	if (providerId === "openai" || providerId === "openrouter" || providerId === "ollama" || providerId === "custom") {
+		// OpenAI形式: choices[0].delta.content
+		const choices = json.choices as Array<Record<string, unknown>> | undefined;
+		if (choices && choices.length > 0) {
+			const delta = choices[0].delta as Record<string, unknown> | undefined;
+			return (delta?.content as string) || "";
+		}
+	} else if (providerId === "anthropic") {
+		// Anthropic形式: delta.text (content_block_delta イベント)
+		const type = json.type as string;
+		if (type === "content_block_delta") {
+			const delta = json.delta as Record<string, unknown> | undefined;
+			return (delta?.text as string) || "";
+		}
+	} else if (providerId === "gemini") {
+		// Gemini形式: candidates[0].content.parts[0].text
+		const candidates = json.candidates as Array<Record<string, unknown>> | undefined;
+		if (candidates && candidates.length > 0) {
+			const content = candidates[0].content as Record<string, unknown> | undefined;
+			const parts = content?.parts as Array<Record<string, unknown>> | undefined;
+			if (parts && parts.length > 0) {
+				return (parts[0].text as string) || "";
+			}
+		}
+	}
+	return "";
+}
+
+// --- レスポンスパーサー ---
+
+function parseOpenAIResponse(json: Record<string, unknown>): ChatResponse {
+	const choices = json.choices as Array<Record<string, unknown>>;
+	const message = choices?.[0]?.message as Record<string, unknown>;
+	const usage = json.usage as Record<string, unknown> | undefined;
+
+	return {
+		content: (message?.content as string) || "",
+		model: (json.model as string) || "",
+		usage: usage
+			? {
+				inputTokens: (usage.prompt_tokens as number) || 0,
+				outputTokens: (usage.completion_tokens as number) || 0,
+			}
+			: undefined,
+		finishReason: (choices?.[0]?.finish_reason as string) || undefined,
+	};
+}
+
+function parseAnthropicResponse(json: Record<string, unknown>): ChatResponse {
+	const content = json.content as Array<Record<string, unknown>>;
+	const textBlock = content?.find((c) => c.type === "text");
+	const usage = json.usage as Record<string, unknown> | undefined;
+
+	return {
+		content: (textBlock?.text as string) || "",
+		model: (json.model as string) || "",
+		usage: usage
+			? {
+				inputTokens: (usage.input_tokens as number) || 0,
+				outputTokens: (usage.output_tokens as number) || 0,
+			}
+			: undefined,
+		finishReason: (json.stop_reason as string) || undefined,
+	};
+}
+
+function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
+	const candidates = json.candidates as Array<Record<string, unknown>>;
+	const content = candidates?.[0]?.content as Record<string, unknown>;
+	const parts = content?.parts as Array<Record<string, unknown>>;
+	const usageMeta = json.usageMetadata as Record<string, unknown> | undefined;
+
+	return {
+		content: (parts?.[0]?.text as string) || "",
+		model: (json.modelVersion as string) || "",
+		usage: usageMeta
+			? {
+				inputTokens: (usageMeta.promptTokenCount as number) || 0,
+				outputTokens: (usageMeta.candidatesTokenCount as number) || 0,
+			}
+			: undefined,
+		finishReason: (candidates?.[0]?.finishReason as string) || undefined,
+	};
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

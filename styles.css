@@ -1,0 +1,939 @@
+/* ============================================
+   LLM Assistant — Mobile-First Responsive CSS
+   ============================================ */
+
+/* --- ベース: モバイルファースト --- */
+
+.llm-assistant-view {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	font-size: 16px; /* iOS auto-zoom 防止: 16px未満だとズーム発生 */
+	overflow: hidden;
+	padding: 0 !important;
+	padding-bottom: 0 !important;
+	margin-bottom: 0 !important;
+}
+
+/* --- ヘッダー --- */
+
+.llm-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+	min-height: 44px; /* Apple HIG: 最小タップターゲット */
+	gap: 4px;
+}
+
+.llm-model-selector-wrapper {
+	flex: 1;
+	min-width: 0;
+}
+
+.llm-model-selector {
+	width: 100%;
+	font-size: 14px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	min-height: 36px;
+	cursor: pointer;
+}
+
+.llm-header-actions {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.llm-header-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px; /* Apple HIG タップターゲット */
+	height: 44px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 18px;
+	cursor: pointer;
+	border-radius: 6px;
+	padding: 0;
+}
+
+.llm-header-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.llm-header-btn:active {
+	background: var(--background-modifier-active-hover);
+}
+
+.llm-header-btn svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* --- チャット出力エリア --- */
+
+.llm-chat-output {
+	flex: 1;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch; /* iOS スムーズスクロール */
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	user-select: text !important;
+	-webkit-user-select: text !important;
+}
+
+/* --- メッセージ --- */
+
+.llm-message {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-width: 100%;
+	animation: llm-message-fadein 0.2s ease-out;
+}
+
+@keyframes llm-message-fadein {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.llm-message-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.llm-message-content {
+	padding: 10px 14px;
+	border-radius: 10px;
+	line-height: 1.6;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	user-select: text !important;
+	-webkit-user-select: text !important;
+	cursor: text;
+}
+
+.llm-message-user .llm-message-content {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-bottom-right-radius: 4px;
+}
+
+/* ユーザーメッセージの選択テキストを可視化 */
+.llm-message-user .llm-message-content::selection,
+.llm-message-user .llm-message-content *::selection {
+	background: rgba(255, 255, 255, 0.4);
+	color: inherit;
+}
+
+.llm-message-user .llm-message-content::-moz-selection,
+.llm-message-user .llm-message-content *::-moz-selection {
+	background: rgba(255, 255, 255, 0.4);
+	color: inherit;
+}
+
+.llm-message-assistant .llm-message-content {
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-bottom-left-radius: 4px;
+}
+
+/* Markdown レンダリング内のスタイル調整 */
+.llm-message-assistant .llm-message-content p {
+	margin: 0.4em 0;
+}
+
+.llm-message-assistant .llm-message-content code {
+	font-size: 0.9em;
+}
+
+.llm-message-assistant .llm-message-content pre {
+	padding: 8px 12px;
+	border-radius: 6px;
+	overflow-x: auto;
+}
+
+/* --- メッセージヘッダー（ラベル + 編集ボタン） --- */
+
+.llm-message-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px;
+}
+
+.llm-message-edit-btn {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border: none;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: pointer;
+	border-radius: 4px;
+	padding: 0;
+}
+
+.llm-message-edit-btn svg {
+	width: 12px;
+	height: 12px;
+}
+
+.llm-message-edit-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* デスクトップ: ホバーで表示 */
+.llm-message:hover .llm-message-edit-btn {
+	display: flex;
+}
+
+/* モバイル: 常時表示 */
+@media (max-width: 767px) {
+	.llm-message-edit-btn {
+		display: flex;
+	}
+}
+
+/* --- ツールバー --- */
+
+.llm-toolbar {
+	display: flex;
+	align-items: center;
+	padding: 4px 8px;
+	border-top: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+	gap: 2px;
+}
+
+.llm-toolbar-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 36px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 16px;
+	cursor: pointer;
+	border-radius: 6px;
+	padding: 0;
+}
+
+.llm-toolbar-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.llm-toolbar-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* --- コンテキストバー（添付ノート表示） --- */
+
+.llm-context-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary-alt);
+	flex-shrink: 0;
+}
+
+.llm-context-tag {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	background: var(--background-modifier-hover);
+	border-radius: 12px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.llm-context-tag-name {
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.llm-context-tag-remove {
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 14px;
+	padding: 0 2px;
+	line-height: 1;
+	min-width: 20px;
+	min-height: 20px;
+}
+
+.llm-context-tag-remove:hover {
+	color: var(--text-error);
+}
+
+.llm-context-total {
+	font-size: 11px;
+	color: var(--text-faint);
+	margin-left: auto;
+}
+
+/* --- 入力エリア --- */
+
+.llm-chat-input-container {
+	flex-shrink: 0;
+	border-top: 1px solid var(--background-modifier-border);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.llm-chat-input {
+	display: flex;
+	align-items: flex-end;
+	padding: 4px 8px;
+	gap: 4px;
+}
+
+.llm-input-textarea {
+	flex: 1;
+	font-size: 16px; /* iOS auto-zoom防止 */
+	font-family: inherit;
+	line-height: 1.5;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	resize: none;
+	overflow-y: hidden;
+	min-height: 2.5em;
+	max-height: 50vh;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+.llm-input-textarea:focus {
+	border-color: var(--interactive-accent);
+}
+
+.llm-input-textarea::placeholder {
+	color: var(--text-faint);
+}
+
+.llm-send-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px; /* Apple HIG タップターゲット */
+	height: 44px;
+	border: none;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: 16px;
+	cursor: pointer;
+	border-radius: 50%;
+	flex-shrink: 0;
+	transition: opacity 0.15s ease;
+}
+
+.llm-send-btn:hover {
+	opacity: 0.9;
+}
+
+.llm-send-btn:active {
+	opacity: 0.7;
+}
+
+.llm-send-btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.llm-send-btn svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* ============================================
+   タブレット (≥ 600px)
+   ============================================ */
+
+@media (min-width: 600px) {
+	.llm-input-textarea {
+		min-height: 3em;
+	}
+
+	.llm-model-selector {
+		font-size: 14px;
+	}
+}
+
+/* ============================================
+   デスクトップ: ボタン小型化 (≥ 768px)
+   ============================================ */
+
+@media (min-width: 768px) {
+	.llm-header-btn {
+		width: 32px;
+		height: 32px;
+	}
+
+	.llm-header-btn svg {
+		width: 16px;
+		height: 16px;
+	}
+
+	.llm-toolbar-btn {
+		width: 32px;
+		height: 28px;
+	}
+
+	.llm-toolbar-btn svg {
+		width: 14px;
+		height: 14px;
+	}
+
+	.llm-header {
+		min-height: 36px;
+	}
+
+	.llm-send-btn {
+		width: 36px;
+		height: 36px;
+	}
+
+	.llm-send-btn svg {
+		width: 16px;
+		height: 16px;
+	}
+}
+
+/* ============================================
+   デスクトップ (≥ 1024px)
+   ============================================ */
+
+@media (min-width: 1024px) {
+	.llm-assistant-view {
+		min-width: 350px;
+	}
+
+	.llm-header {
+		padding: 8px 12px;
+	}
+
+	.llm-chat-output {
+		padding: 16px;
+	}
+
+	.llm-chat-input {
+		padding: 10px 12px;
+	}
+
+	.llm-input-textarea {
+		padding: 10px 14px;
+	}
+
+	.llm-message-content {
+		padding: 12px 16px;
+	}
+}
+
+/* ============================================
+   iPhone 固有対応
+   ============================================ */
+
+/* SafeArea — Obsidianがすでにハンドルしているため最小限に */
+
+/* ダークモード対応 — Obsidian変数を利用しているため自動対応 */
+
+/* ============================================
+   エラーメッセージ
+   ============================================ */
+
+.llm-message-error .llm-message-content {
+	background: rgba(var(--color-red-rgb, 255, 0, 0), 0.1);
+	border: 1px solid rgba(var(--color-red-rgb, 255, 0, 0), 0.3);
+	color: var(--text-error, #e74c3c);
+}
+
+/* ============================================
+   生成中インジケーター
+   ============================================ */
+
+.llm-generating {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	color: var(--text-muted);
+	font-size: 14px;
+}
+
+.llm-generating-dots {
+	display: flex;
+	gap: 4px;
+}
+
+.llm-generating-dots span {
+	width: 6px;
+	height: 6px;
+	background: var(--text-muted);
+	border-radius: 50%;
+	animation: llm-dot-bounce 1.4s ease-in-out infinite;
+}
+
+.llm-generating-dots span:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.llm-generating-dots span:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes llm-dot-bounce {
+	0%, 80%, 100% {
+		transform: scale(0.6);
+		opacity: 0.4;
+	}
+	40% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+/* ============================================
+   フォントサイズ設定（小・中・大）
+   ============================================ */
+
+/* --- 小（コンパクト） --- */
+.llm-assistant-view.llm-font-small {
+	font-size: 13px;
+}
+
+.llm-assistant-view.llm-font-small .llm-chat-output {
+	padding: 6px;
+	gap: 6px;
+}
+
+.llm-assistant-view.llm-font-small .llm-message {
+	gap: 2px;
+}
+
+.llm-assistant-view.llm-font-small .llm-message-label {
+	font-size: 10px;
+}
+
+.llm-assistant-view.llm-font-small .llm-message-content {
+	padding: 6px 10px;
+	line-height: 1.4;
+	border-radius: 8px;
+	font-size: 13px;
+}
+
+.llm-assistant-view.llm-font-small .llm-input-textarea {
+	font-size: 16px; /* iOS auto-zoom 防止: 16px未満にしない */
+	padding: 6px 10px;
+	min-height: 2em;
+}
+
+.llm-assistant-view.llm-font-small .llm-chat-input {
+	padding: 3px 6px;
+	gap: 4px;
+}
+
+.llm-assistant-view.llm-font-small .llm-header {
+	padding: 3px 6px;
+	min-height: 36px;
+}
+
+.llm-assistant-view.llm-font-small .llm-toolbar {
+	padding: 2px 6px;
+}
+
+.llm-assistant-view.llm-font-small .llm-context-bar {
+	padding: 3px 6px;
+	gap: 4px;
+}
+
+.llm-assistant-view.llm-font-small .llm-generating {
+	font-size: 12px;
+	padding: 4px 10px;
+}
+
+/* --- 中（デフォルト） --- */
+.llm-assistant-view.llm-font-medium {
+	font-size: 15px;
+}
+
+.llm-assistant-view.llm-font-medium .llm-chat-output {
+	padding: 8px;
+	gap: 8px;
+}
+
+.llm-assistant-view.llm-font-medium .llm-message {
+	gap: 3px;
+}
+
+.llm-assistant-view.llm-font-medium .llm-message-content {
+	padding: 8px 12px;
+	line-height: 1.5;
+	font-size: 15px;
+}
+
+.llm-assistant-view.llm-font-medium .llm-input-textarea {
+	font-size: 16px; /* iOS auto-zoom 防止 */
+	padding: 8px 10px;
+}
+
+/* --- 大 --- */
+.llm-assistant-view.llm-font-large {
+	font-size: 17px;
+}
+
+.llm-assistant-view.llm-font-large .llm-message-label {
+	font-size: 13px;
+}
+
+.llm-assistant-view.llm-font-large .llm-message-content {
+	padding: 10px 14px;
+	line-height: 1.6;
+	font-size: 17px;
+}
+
+.llm-assistant-view.llm-font-large .llm-input-textarea {
+	font-size: 17px;
+}
+
+/* ============================================
+   会話履歴モーダル
+   ============================================ */
+
+.llm-conversation-list-modal {
+	max-width: 500px;
+}
+
+.llm-conversation-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.llm-conversation-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.llm-conversation-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.llm-conversation-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.llm-conversation-title {
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.llm-conversation-meta {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
+.llm-conversation-delete {
+	border: none;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: pointer;
+	font-size: 16px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+.llm-conversation-delete:hover {
+	color: var(--text-error);
+	background: var(--background-modifier-hover);
+}
+
+.llm-conversation-empty {
+	color: var(--text-muted);
+	text-align: center;
+	padding: 20px;
+}
+
+/* --- 編集提案 (Edit Proposal) --- */
+
+.llm-edit-proposal {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	margin-top: 10px;
+	overflow: hidden;
+}
+
+.llm-edit-proposal-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: 13px;
+}
+
+.llm-edit-proposal-icon {
+	display: flex;
+	align-items: center;
+	color: var(--text-accent);
+	flex-shrink: 0;
+}
+
+.llm-edit-proposal-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.llm-edit-proposal-path {
+	font-family: var(--font-monospace);
+	font-weight: 500;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.llm-edit-proposal-badge {
+	font-size: 11px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	flex-shrink: 0;
+	font-weight: 500;
+}
+
+.llm-badge-new {
+	background: rgba(0, 180, 100, 0.15);
+	color: var(--text-success, #00b464);
+}
+
+.llm-badge-modified {
+	background: rgba(220, 160, 0, 0.15);
+	color: var(--text-warning, #dca000);
+}
+
+/* --- 差分表示 (Diff View) --- */
+
+.llm-edit-diff {
+	max-height: 300px;
+	overflow-y: auto;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 1.5;
+	padding: 4px 0;
+	background: var(--background-primary-alt);
+}
+
+.llm-diff-line {
+	padding: 0 10px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.llm-diff-add {
+	background: rgba(0, 180, 100, 0.12);
+	color: var(--text-success, #00b464);
+}
+
+.llm-diff-remove {
+	background: rgba(220, 50, 50, 0.12);
+	color: var(--text-error, #dc3232);
+	text-decoration: line-through;
+	opacity: 0.8;
+}
+
+.llm-diff-same {
+	color: var(--text-muted);
+}
+
+.llm-diff-separator {
+	color: var(--text-faint);
+	text-align: center;
+	padding: 2px 10px;
+	font-style: italic;
+	border-top: 1px dashed var(--background-modifier-border);
+	border-bottom: 1px dashed var(--background-modifier-border);
+}
+
+/* --- 編集アクションボタン --- */
+
+.llm-edit-proposal-actions {
+	display: flex;
+	gap: 8px;
+	padding: 6px 10px;
+	background: var(--background-secondary);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.llm-edit-apply-btn,
+.llm-edit-dismiss-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 12px;
+	border-radius: 5px;
+	font-size: 13px;
+	cursor: pointer;
+	border: none;
+	transition: opacity 0.15s;
+	min-height: 36px;
+}
+
+.llm-edit-apply-btn svg,
+.llm-edit-dismiss-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.llm-edit-apply-btn {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.llm-edit-apply-btn:hover:not([disabled]) {
+	opacity: 0.85;
+}
+
+.llm-edit-dismiss-btn {
+	background: transparent;
+	color: var(--text-muted);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.llm-edit-dismiss-btn:hover:not([disabled]) {
+	background: var(--background-modifier-hover);
+}
+
+.llm-edit-apply-btn[disabled],
+.llm-edit-dismiss-btn[disabled] {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.llm-edit-applied {
+	border-color: var(--text-success, #00b464);
+}
+
+.llm-edit-applied .llm-edit-proposal-header {
+	background: rgba(0, 180, 100, 0.08);
+}
+
+.llm-edit-dismissed {
+	opacity: 0.5;
+}
+
+/* --- チャンク (Hunk) --- */
+
+.llm-edit-hunk {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.llm-edit-hunk:first-child,
+.llm-edit-bulk-actions + .llm-edit-hunk {
+	border-top: none;
+}
+
+.llm-edit-hunk-header {
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-muted);
+	background: var(--background-secondary-alt, var(--background-secondary));
+}
+
+.llm-edit-hunk.llm-edit-applied > .llm-edit-hunk-header {
+	background: rgba(0, 180, 100, 0.08);
+}
+
+.llm-edit-hunk.llm-edit-dismissed {
+	opacity: 0.5;
+}
+
+/* --- 一括操作ボタン --- */
+
+.llm-edit-bulk-actions {
+	display: flex;
+	gap: 8px;
+	padding: 6px 10px;
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* --- Undoボタン --- */
+
+.llm-edit-undo-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 12px;
+	border-radius: 5px;
+	font-size: 13px;
+	cursor: pointer;
+	border: 1px solid var(--background-modifier-border);
+	background: transparent;
+	color: var(--text-warning, #dca000);
+	transition: opacity 0.15s;
+	min-height: 36px;
+}
+
+.llm-edit-undo-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.llm-edit-undo-btn:hover:not([disabled]) {
+	background: rgba(220, 160, 0, 0.1);
+}
+
+.llm-edit-undo-btn[disabled] {
+	opacity: 0.5;
+	cursor: default;
+}
