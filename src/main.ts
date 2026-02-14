@@ -1,4 +1,4 @@
-import { Menu, Plugin, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { VIEW_TYPE_CHAT, DEFAULT_SETTINGS, DISPLAY_NAME, getQuickActions } from "./constants";
 import type { LLMAssistantSettings } from "./constants";
 import { ChatView } from "./ui/ChatView";
@@ -6,7 +6,7 @@ import { LLMAssistantSettingTab } from "./settings/SettingsTab";
 import { ProviderRegistry } from "./llm/ProviderRegistry";
 import { CustomEndpointProvider } from "./llm/CustomEndpointProvider";
 import { VaultReader } from "./vault/VaultReader";
-import { SecretManager } from "./security/SecretManager";
+import { SecretManager, type SecurityLevel } from "./security/SecretManager";
 import { resolveLocale, setLocale, t } from "./i18n";
 
 export default class LLMAssistantPlugin extends Plugin {
@@ -28,6 +28,9 @@ export default class LLMAssistantPlugin extends Plugin {
 			async (data) => { await this.saveData(data); },
 			async () => { return await this.loadData(); },
 		);
+
+		// plaintext からの移行（v0.1.3で廃止）
+		await this.migratePlaintextKeys();
 
 		// カスタムエンドポイント設定を反映
 		const customProvider = this.providerRegistry.get("custom") as CustomEndpointProvider | undefined;
@@ -109,8 +112,60 @@ export default class LLMAssistantPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * plaintext で保存された API鍵を secretstorage/webcrypto に移行し、
+	 * data.json から plaintextKeys フィールドを物理削除する。
+	 */
+	private async migratePlaintextKeys(): Promise<void> {
+		const data = (await this.loadData()) as Record<string, unknown> | null;
+		if (!data?.plaintextKeys) return;
+
+		const plaintextKeys = data.plaintextKeys as Record<string, string>;
+		const providers = Object.keys(plaintextKeys).filter(
+			(k) => typeof plaintextKeys[k] === "string" && plaintextKeys[k].length > 0
+		);
+		if (providers.length === 0) {
+			// 空の plaintextKeys を削除
+			delete data.plaintextKeys;
+			await this.saveData(data);
+			return;
+		}
+
+		const targetLevel: SecurityLevel = this.secretManager.isSecretStorageAvailable()
+			? "secretstorage" : "webcrypto";
+
+		this.settings.securityLevel = targetLevel;
+		this.secretManager.setSecurityLevel(targetLevel);
+
+		let migrated = 0;
+		for (const providerId of providers) {
+			try {
+				await this.secretManager.saveApiKey(providerId, plaintextKeys[providerId]);
+				migrated++;
+			} catch {
+				// webcrypto でマスターパスワード未設定の場合などはスキップ
+			}
+		}
+
+		// plaintextKeys フィールドを物理削除
+		delete data.plaintextKeys;
+		if (data.securityLevel === "plaintext") {
+			data.securityLevel = targetLevel;
+		}
+		await this.saveData(data);
+		await this.saveSettings();
+
+		if (migrated > 0) {
+			new Notice(`API keys migrated from plaintext to ${targetLevel} (${migrated} keys)`);
+		}
+	}
+
 	async loadSettings(): Promise<void> {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// plaintext が設定に残っていた場合のフォールバック
+		if ((this.settings.securityLevel as string) === "plaintext") {
+			this.settings.securityLevel = "secretstorage";
+		}
 	}
 
 	async saveSettings(): Promise<void> {
