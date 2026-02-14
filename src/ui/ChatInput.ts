@@ -7,11 +7,13 @@ export class ChatInput {
 	private sendBtn: HTMLButtonElement;
 	private onSend: (text: string) => void;
 	private isComposing = false;
+	private viewportHandler: (() => void) | null = null;
 
 	constructor(containerEl: HTMLElement, onSend: (text: string) => void) {
 		this.containerEl = containerEl;
 		this.onSend = onSend;
 		this.build();
+		this.setupKeyboardHandler();
 	}
 
 	private build(): void {
@@ -47,6 +49,13 @@ export class ChatInput {
 			}
 		});
 
+		// フォーカス時にスクロールで入力欄を可視化（iOSキーボード対応）
+		this.textareaEl.addEventListener("focus", () => {
+			setTimeout(() => {
+				this.textareaEl.scrollIntoView({ block: "end", behavior: "smooth" });
+			}, 300);
+		});
+
 		// 送信ボタン
 		this.sendBtn = wrapper.createEl("button", {
 			cls: "llm-send-btn",
@@ -58,10 +67,35 @@ export class ChatInput {
 		});
 	}
 
+	/**
+	 * visualViewport APIでiOSキーボード表示時のレイアウト調整
+	 */
+	private setupKeyboardHandler(): void {
+		if (!window.visualViewport) return;
+
+		this.viewportHandler = () => {
+			const vv = window.visualViewport!;
+			const keyboardHeight = window.innerHeight - vv.height;
+			const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
+			if (!chatView) return;
+
+			if (keyboardHeight > 50) {
+				// キーボード表示中: ビューの高さをビジュアルビューポートに合わせる
+				chatView.style.height = `${vv.height}px`;
+			} else {
+				// キーボード非表示: 通常のレイアウトに戻す
+				chatView.style.height = "100%";
+			}
+		};
+
+		window.visualViewport.addEventListener("resize", this.viewportHandler);
+	}
+
 	private autoExpand(): void {
 		const textarea = this.textareaEl;
 		textarea.style.height = "auto";
-		const maxHeight = window.innerHeight * 0.5; // 画面の50%が上限
+		const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+		const maxHeight = viewportHeight * 0.3; // ビジュアルビューポートの30%が上限
 		const scrollHeight = textarea.scrollHeight;
 		textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
 		textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden";
@@ -93,5 +127,17 @@ export class ChatInput {
 	enable(): void {
 		this.textareaEl.disabled = false;
 		this.sendBtn.disabled = false;
+	}
+
+	destroy(): void {
+		if (this.viewportHandler && window.visualViewport) {
+			window.visualViewport.removeEventListener("resize", this.viewportHandler);
+			this.viewportHandler = null;
+		}
+		// キーボードで変更した高さをリセット
+		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
+		if (chatView) {
+			chatView.style.height = "100%";
+		}
 	}
 }
