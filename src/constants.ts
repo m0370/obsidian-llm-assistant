@@ -22,7 +22,7 @@ export interface LLMAssistantSettings {
 	activeProvider: string;
 	activeModel: string;
 	streamingEnabled: boolean;
-	securityLevel: "secretstorage" | "webcrypto" | "plaintext";
+	securityLevel: "secretstorage" | "webcrypto";
 	systemPrompt: string;
 	temperature: number;
 	maxTokens: number;

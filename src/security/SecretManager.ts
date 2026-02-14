@@ -1,18 +1,17 @@
 import type { App } from "obsidian";
 import { encryptApiKey, decryptApiKey, type EncryptedData } from "./WebCryptoFallback";
 
-export type SecurityLevel = "secretstorage" | "webcrypto" | "plaintext";
+export type SecurityLevel = "secretstorage" | "webcrypto";
 
 interface StoredKeys {
 	[providerId: string]: EncryptedData | string;
 }
 
 /**
- * 3段階のAPI鍵管理統合マネージャー
+ * API鍵管理統合マネージャー
  *
  * 優先度1: SecretStorage API (v1.11.4+) — OS標準のセキュアストレージ
  * 優先度2: Web Crypto API暗号化 — PBKDF2 + AES-256-GCM
- * 優先度3: plugin data.json平文保存 — 簡易モード（警告付き）
  */
 export class SecretManager {
 	private app: App;
@@ -81,9 +80,6 @@ export class SecretManager {
 			case "webcrypto":
 				await this.saveWithWebCrypto(providerId, trimmedKey);
 				break;
-			case "plaintext":
-				await this.saveAsPlaintext(providerId, trimmedKey);
-				break;
 		}
 	}
 
@@ -96,8 +92,6 @@ export class SecretManager {
 				return this.getFromSecretStorage(providerId);
 			case "webcrypto":
 				return this.getFromWebCrypto(providerId);
-			case "plaintext":
-				return this.getFromPlaintext(providerId);
 		}
 	}
 
@@ -110,7 +104,6 @@ export class SecretManager {
 				await this.deleteFromSecretStorage(providerId);
 				break;
 			case "webcrypto":
-			case "plaintext":
 				await this.deleteFromData(providerId);
 				break;
 		}
@@ -176,27 +169,6 @@ export class SecretManager {
 		}
 	}
 
-	// --- 平文保存 ---
-
-	private async saveAsPlaintext(providerId: string, apiKey: string): Promise<void> {
-		const data = (await this.loadDataFn()) || {};
-		const storedKeys: StoredKeys = (data.plaintextKeys as StoredKeys) || {};
-		storedKeys[providerId] = apiKey;
-		data.plaintextKeys = storedKeys;
-		await this.saveDataFn(data);
-	}
-
-	private async getFromPlaintext(providerId: string): Promise<string | null> {
-		const data = await this.loadDataFn();
-		if (!data) return null;
-		const storedKeys = data.plaintextKeys as StoredKeys | undefined;
-		if (!storedKeys || !storedKeys[providerId]) return null;
-
-		const value = storedKeys[providerId];
-		if (typeof value === "string") return value;
-		return null;
-	}
-
 	// --- 共通削除 ---
 
 	private async deleteFromData(providerId: string): Promise<void> {
@@ -206,12 +178,6 @@ export class SecretManager {
 		if (encryptedKeys) {
 			delete encryptedKeys[providerId];
 			data.encryptedKeys = encryptedKeys;
-		}
-
-		const plaintextKeys = data.plaintextKeys as StoredKeys | undefined;
-		if (plaintextKeys) {
-			delete plaintextKeys[providerId];
-			data.plaintextKeys = plaintextKeys;
 		}
 
 		await this.saveDataFn(data);
