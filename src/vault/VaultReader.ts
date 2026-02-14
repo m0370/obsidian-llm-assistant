@@ -1,4 +1,4 @@
-import { App, TFile, TFolder, TAbstractFile } from "obsidian";
+import { App, TFile, TFolder, TAbstractFile, WorkspaceLeaf } from "obsidian";
 
 export interface FileContent {
 	path: string;
@@ -148,6 +148,26 @@ export class VaultReader {
 			.sort((a, b) => b.stat.mtime - a.stat.mtime)
 			.slice(0, limit)
 			.map(f => f.path);
+	}
+
+	/**
+	 * 最近開いたMarkdownファイルを取得（モバイル用フォールバック）
+	 * チャットパネルがアクティブの場合、getActiveFile()がnullを返すため、
+	 * ワークスペースの他のリーフからMarkdownファイルを探す
+	 */
+	getMostRecentLeafFile(app: App): TFile | null {
+		const leaves: WorkspaceLeaf[] = [];
+		app.workspace.iterateAllLeaves((leaf) => {
+			leaves.push(leaf);
+		});
+		for (const leaf of leaves) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const file = (leaf.view as any)?.file;
+			if (file instanceof TFile && file.extension === "md") {
+				return file;
+			}
+		}
+		return null;
 	}
 
 	/**
