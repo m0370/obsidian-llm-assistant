@@ -124,6 +124,8 @@ export class ChatView extends ItemView {
 		});
 
 		// Visual Viewport API によるキーボード対応（モバイル）
+		// デバッグモード: 画面上部にviewport値を表示（問題解決後に削除）
+		container.dataset.llmDebug = "1";
 		this.viewportCleanup = setupMobileViewportHandler(container);
 	}
 
