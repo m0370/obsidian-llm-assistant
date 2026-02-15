@@ -146,14 +146,22 @@ export class GeminiProvider implements LLMProvider {
 		return models
 			.filter(m => {
 				const methods = m.supportedGenerationMethods as string[] | undefined;
-				return methods?.includes("generateContent");
+				if (!methods?.includes("generateContent")) return false;
+				const id = ((m.name as string) || "").replace("models/", "");
+				// gemini-で始まるもののみ
+				if (!id.startsWith("gemini-")) return false;
+				// 実験版・embedding・旧世代を除外
+				if (id.includes("-exp-")) return false;
+				if (id.includes("embedding")) return false;
+				if (id.startsWith("gemini-1.0")) return false;
+				if (id.startsWith("gemini-pro")) return false;  // 旧gemini-pro
+				return true;
 			})
 			.map(m => ({
 				id: ((m.name as string) || "").replace("models/", ""),
 				name: (m.displayName as string) || (m.name as string) || "",
 				contextWindow: (m.inputTokenLimit as number) || 32000,
 			}))
-			.filter(m => m.id.startsWith("gemini"))
 			.sort((a, b) => b.id.localeCompare(a.id));
 	}
 }

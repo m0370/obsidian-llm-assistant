@@ -100,6 +100,31 @@ export class AnthropicProvider implements LLMProvider {
 		throw new Error("Use sendRequest() from streaming.ts instead of calling chatComplete directly");
 	}
 
+	async fetchModels(apiKey: string): Promise<ModelInfo[]> {
+		const trimmed = apiKey.trim();
+		const response = await requestUrl({
+			url: "https://api.anthropic.com/v1/models?limit=100",
+			method: "GET",
+			headers: this.buildHeaders(trimmed),
+			throw: false,
+		});
+		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+
+		const data = response.json.data as Array<Record<string, unknown>>;
+		return data
+			.filter(m => {
+				const id = m.id as string;
+				// claude-*のみ、かつエイリアス（日付なし）は除外して重複を防ぐ
+				return id.startsWith("claude-") && !id.endsWith("-latest");
+			})
+			.map(m => ({
+				id: m.id as string,
+				name: (m.display_name as string) || (m.id as string),
+				contextWindow: 200000,
+			}))
+			.slice(0, 20);
+	}
+
 	async validateApiKey(apiKey: string): Promise<boolean> {
 		const trimmed = apiKey.trim();
 		const response = await requestUrl({
