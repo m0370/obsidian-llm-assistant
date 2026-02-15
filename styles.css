@@ -229,65 +229,7 @@
 	padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* --- アクションバー（Gemini風コンパクト） --- */
-
-.llm-action-bar {
-	display: flex;
-	align-items: center;
-	padding: 2px 8px;
-	gap: 2px;
-}
-
-.llm-action-bar-left {
-	display: flex;
-	align-items: center;
-	gap: 0;
-}
-
-.llm-action-bar-right {
-	display: flex;
-	align-items: center;
-	margin-left: auto;
-}
-
-.llm-action-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 36px;
-	height: 36px;
-	border: none;
-	background: transparent;
-	color: var(--text-muted);
-	cursor: pointer;
-	border-radius: 6px;
-	padding: 0;
-	position: relative;
-}
-
-/* タップ領域を44pxに拡張（Apple HIG準拠） */
-.llm-action-btn::after {
-	content: "";
-	position: absolute;
-	top: -4px;
-	left: -4px;
-	right: -4px;
-	bottom: -4px;
-}
-
-.llm-action-btn:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-.llm-action-btn:active {
-	background: var(--background-modifier-active-hover);
-}
-
-.llm-action-btn svg {
-	width: 16px;
-	height: 16px;
-}
+/* --- アクションバーは廃止: Sendボタンは入力エリア内に統合 --- */
 
 /* --- コンテキストバー（添付ノート表示） --- */
 
@@ -456,16 +398,6 @@
 		height: 16px;
 	}
 
-	.llm-action-btn {
-		width: 32px;
-		height: 32px;
-	}
-
-	.llm-action-btn svg {
-		width: 16px;
-		height: 16px;
-	}
-
 	.llm-header {
 		min-height: 36px;
 	}
@@ -518,10 +450,6 @@
 /* keyboard-open状態: スペース最大節約 */
 .llm-assistant-view.keyboard-open .llm-context-bar {
 	display: none !important;
-}
-
-.llm-assistant-view.keyboard-open .llm-action-bar {
-	padding: 1px 8px;
 }
 
 .llm-assistant-view.keyboard-open .llm-chat-input {
@@ -639,15 +567,6 @@
 .llm-assistant-view.llm-font-small .llm-header {
 	padding: 3px 6px;
 	min-height: 36px;
-}
-
-.llm-assistant-view.llm-font-small .llm-action-bar {
-	padding: 1px 6px;
-}
-
-.llm-assistant-view.llm-font-small .llm-action-btn {
-	width: 30px;
-	height: 30px;
 }
 
 .llm-assistant-view.llm-font-small .llm-send-btn {
