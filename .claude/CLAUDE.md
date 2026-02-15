@@ -68,3 +68,6 @@ src/utils/               — ユーティリティ
 - デプロイ先: `/Users/tgoto/Library/Mobile Documents/iCloud~md~obsidian/Documents/My Obsidian/.obsidian/plugins/obsidian-llm-assistant/`
 - ビルドコマンド: `npm run build`
 - デプロイ: `main.js` と `styles.css` をデプロイ先にコピー
+
+## 進捗ドキュメント
+- `.claude/docs/progress-2026-02-15.md` — 完了済み/未対応/今後のToDo一覧

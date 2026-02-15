@@ -1,5 +1,5 @@
 import { requestUrl, Platform } from "obsidian";
-import type { LLMProvider, ChatRequest, ChatResponse } from "./LLMProvider";
+import type { LLMProvider, ChatRequest, ChatResponse, ToolUseBlock } from "./LLMProvider";
 import type { GeminiProvider } from "./GeminiProvider";
 
 /**
@@ -274,11 +274,27 @@ function parseOpenAIResponse(json: Record<string, unknown>): ChatResponse {
 
 function parseAnthropicResponse(json: Record<string, unknown>): ChatResponse {
 	const content = json.content as Array<Record<string, unknown>>;
-	const textBlock = content?.find((c) => c.type === "text");
 	const usage = json.usage as Record<string, unknown> | undefined;
 
+	const textParts: string[] = [];
+	const toolUses: ToolUseBlock[] = [];
+
+	if (content) {
+		for (const block of content) {
+			if (block.type === "text") {
+				textParts.push(block.text as string);
+			} else if (block.type === "tool_use") {
+				toolUses.push({
+					id: block.id as string,
+					name: block.name as string,
+					input: block.input as Record<string, unknown>,
+				});
+			}
+		}
+	}
+
 	return {
-		content: (textBlock?.text as string) || "",
+		content: textParts.join(""),
 		model: (json.model as string) || "",
 		usage: usage
 			? {
@@ -287,6 +303,7 @@ function parseAnthropicResponse(json: Record<string, unknown>): ChatResponse {
 			}
 			: undefined,
 		finishReason: (json.stop_reason as string) || undefined,
+		toolUses: toolUses.length > 0 ? toolUses : undefined,
 	};
 }
 
