@@ -13,6 +13,7 @@ export class OllamaProvider implements LLMProvider {
 	apiEndpoint = "http://localhost:11434/v1/chat/completions";
 
 	models: ModelInfo[] = [
+		{ id: "llama4-scout", name: "Llama 4 Scout", contextWindow: 512000 },
 		{ id: "llama3.3", name: "Llama 3.3", contextWindow: 128000 },
 		{ id: "gemma3", name: "Gemma 3", contextWindow: 128000 },
 		{ id: "qwen3", name: "Qwen 3", contextWindow: 40960 },
