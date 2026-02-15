@@ -1,7 +1,7 @@
 import { ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import { VIEW_TYPE_CHAT, DISPLAY_NAME, PROVIDERS } from "../constants";
 import type LLMAssistantPlugin from "../main";
-import type { LLMProvider, Message } from "../llm/LLMProvider";
+import type { LLMProvider, Message, ToolDefinition } from "../llm/LLMProvider";
 import { sendRequest } from "../llm/streaming";
 import { NoteContext } from "../vault/NoteContext";
 import { ConversationManager, type Conversation } from "./ConversationManager";
@@ -10,6 +10,36 @@ import { FilePickerModal } from "./FilePickerModal";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage, type MessageData } from "./ChatMessage";
 import { t } from "../i18n";
+
+/** Anthropic Tool Use API 用のツール定義 */
+const VAULT_TOOLS: ToolDefinition[] = [
+	{
+		name: "vault_read",
+		description: "Read the content of a file from the user's Obsidian vault. Use this to access note contents when the user asks about a specific file, or when you need to read a file before editing it.",
+		input_schema: {
+			type: "object",
+			properties: {
+				path: {
+					type: "string",
+					description: "The file path relative to the vault root (e.g. 'Notes/my-note.md')",
+				},
+			},
+			required: ["path"],
+		},
+	},
+	{
+		name: "vault_write",
+		description: "Write or update a file in the user's Obsidian vault. Always read the file first with vault_read, then propose the full modified content. The user will see a diff and can approve or reject.",
+		input_schema: {
+			type: "object",
+			properties: {
+				path: { type: "string", description: "File path relative to vault root" },
+				content: { type: "string", description: "Complete new content for the file" },
+			},
+			required: ["path", "content"],
+		},
+	},
+];
 
 interface EditHunk {
 	oldText: string;
@@ -402,7 +432,7 @@ export class ChatView extends ItemView {
 
 		try {
 			// システムプロンプトを構築
-			const systemPrompt = await this.buildSystemPrompt(text);
+			const systemPrompt = await this.buildSystemPrompt(text, provider.id);
 
 			// 会話履歴をMessage[]形式に変換
 			const chatMessages: Message[] = this.messages
@@ -413,19 +443,29 @@ export class ChatView extends ItemView {
 					content: m.content,
 				}));
 
-			// LLM呼び出し（vault_readタグによる自動ファイル読み込みループ付き）
-			const finalContent = await this.callLLMWithFileReading(
-				provider,
-				chatMessages,
-				systemPrompt,
-				apiKey,
-				assistantMsg,
-				messageComponent,
-			);
+			// プロバイダーに応じてLLM呼び出し方式を分岐
+			let finalContent: string;
+			let writeOperations: Array<{path: string, content: string}>;
 
-			// vault_writeタグを解析して編集提案を抽出
-			const writeOperations = this.parseVaultWriteTags(finalContent);
-			assistantMsg.content = this.stripVaultWriteTags(finalContent);
+			if (provider.id === "anthropic") {
+				// Anthropic: Tool Use API を使用
+				const result = await this.callLLMWithToolUse(
+					provider, chatMessages, systemPrompt, apiKey,
+					assistantMsg, messageComponent,
+				);
+				finalContent = result.text;
+				writeOperations = result.writeProposals;
+			} else {
+				// 他プロバイダー: テキストタグ方式を維持
+				const rawContent = await this.callLLMWithFileReading(
+					provider, chatMessages, systemPrompt, apiKey,
+					assistantMsg, messageComponent,
+				);
+				writeOperations = this.parseVaultWriteTags(rawContent);
+				finalContent = this.stripVaultWriteTags(rawContent);
+			}
+
+			assistantMsg.content = finalContent;
 
 			// MarkdownRendererで再レンダリング
 			const contentEl = messageComponent.getContentEl();
@@ -462,7 +502,7 @@ export class ChatView extends ItemView {
 	/**
 	 * システムプロンプトを構築（コンテキスト、アクティブノート、wikilink、Vault一覧を含む）
 	 */
-	private async buildSystemPrompt(userText: string): Promise<string> {
+	private async buildSystemPrompt(userText: string, providerId?: string): Promise<string> {
 		const parts: string[] = [];
 
 		// 1. ユーザーのカスタムシステムプロンプト
@@ -470,9 +510,13 @@ export class ChatView extends ItemView {
 			parts.push(this.plugin.settings.systemPrompt);
 		}
 
-		// 2. ファイル読み込み・編集機能の指示（先頭近くに配置してLLMが確実に認識）
-		parts.push(t("context.vaultReadInstruction"));
-		parts.push(t("context.vaultWriteInstruction"));
+		// 2. ファイル読み込み・編集機能の指示（プロバイダーで分岐）
+		if (providerId === "anthropic") {
+			parts.push(t("context.toolUseInstruction"));
+		} else {
+			parts.push(t("context.vaultReadInstruction"));
+			parts.push(t("context.vaultWriteInstruction"));
+		}
 
 		// 3. Vault全体のファイル一覧（コンパクト化: 最大200件）
 		const vaultFiles = this.plugin.vaultReader.getVaultFileList(200);
@@ -600,6 +644,120 @@ export class ChatView extends ItemView {
 		}
 
 		return this.stripVaultReadTags(assistantMsg.content);
+	}
+
+	/**
+	 * Anthropic Tool Use APIを使ったLLM呼び出し（最大5ラウンド）
+	 * vault_read: 自動実行（ファイル読み取り）
+	 * vault_write: ユーザー承認待ち（提案を蓄積してtool_resultで「表示済み」と返す）
+	 */
+	private async callLLMWithToolUse(
+		provider: LLMProvider,
+		chatMessages: Message[],
+		systemPrompt: string,
+		apiKey: string,
+		assistantMsg: MessageData,
+		messageComponent: ChatMessage,
+	): Promise<{ text: string; writeProposals: Array<{path: string, content: string}> }> {
+		const MAX_TOOL_ROUNDS = 5;
+		const writeProposals: Array<{path: string, content: string}> = [];
+		let currentMessages: Message[] = [...chatMessages];
+
+		for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+			// ループ2回目以降はコンテンツをリセット
+			if (round > 0) {
+				assistantMsg.content = "";
+				messageComponent.updateContent(t("chat.readingFiles"));
+			}
+
+			const response = await sendRequest(
+				provider,
+				{
+					model: this.plugin.settings.activeModel,
+					messages: currentMessages,
+					systemPrompt: systemPrompt || undefined,
+					temperature: this.plugin.settings.temperature,
+					maxTokens: this.plugin.settings.maxTokens,
+					stream: false, // Tool Use はストリーミング不可（requestUrl一括受信）
+					tools: VAULT_TOOLS,
+				},
+				apiKey,
+				(token: string) => {
+					assistantMsg.content += token;
+					messageComponent.updateContent(assistantMsg.content);
+					this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
+				}
+			);
+
+			// テキスト部分を更新
+			if (response.content) {
+				assistantMsg.content = response.content;
+				messageComponent.updateContent(assistantMsg.content);
+			}
+
+			// Tool Use がなければ完了
+			if (!response.toolUses || response.toolUses.length === 0
+				|| round === MAX_TOOL_ROUNDS) {
+				return { text: assistantMsg.content, writeProposals };
+			}
+
+			// --- Tool Use の処理 ---
+			messageComponent.updateContent(t("chat.readingFiles"));
+
+			// アシスタントメッセージを rawContent 付きで追加
+			const assistantRawContent: unknown[] = [];
+			if (response.content) {
+				assistantRawContent.push({ type: "text", text: response.content });
+			}
+			for (const tu of response.toolUses) {
+				assistantRawContent.push({
+					type: "tool_use", id: tu.id, name: tu.name, input: tu.input,
+				});
+			}
+			currentMessages.push({
+				role: "assistant", content: response.content || "",
+				rawContent: assistantRawContent,
+			});
+
+			// 各ツールを実行
+			const toolResults: unknown[] = [];
+			for (const toolUse of response.toolUses) {
+				if (toolUse.name === "vault_read") {
+					// 自動実行: ファイル読み取り
+					const filePath = toolUse.input.path as string;
+					const file = this.plugin.vaultReader.getFileByPath(filePath);
+					if (file) {
+						const content = await this.plugin.vaultReader.cachedReadFile(file);
+						toolResults.push({
+							type: "tool_result", tool_use_id: toolUse.id, content,
+						});
+					} else {
+						toolResults.push({
+							type: "tool_result", tool_use_id: toolUse.id,
+							content: `Error: File not found at "${filePath}"`,
+							is_error: true,
+						});
+					}
+				} else if (toolUse.name === "vault_write") {
+					// ユーザー承認待ち: 提案を蓄積
+					writeProposals.push({
+						path: toolUse.input.path as string,
+						content: toolUse.input.content as string,
+					});
+					toolResults.push({
+						type: "tool_result", tool_use_id: toolUse.id,
+						content: "Edit proposal displayed to user for review.",
+					});
+				}
+			}
+
+			// tool_result メッセージを追加
+			currentMessages.push({
+				role: "user", content: "", rawContent: toolResults,
+			});
+		}
+
+		return { text: assistantMsg.content, writeProposals };
 	}
 
 	/**

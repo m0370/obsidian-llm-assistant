@@ -1,6 +1,7 @@
 export interface Message {
 	role: "user" | "assistant" | "system";
 	content: string;
+	rawContent?: unknown[];  // Anthropic Tool Use 用の構造化コンテンツ
 }
 
 export interface ChatRequest {
@@ -10,6 +11,7 @@ export interface ChatRequest {
 	temperature?: number;
 	maxTokens?: number;
 	stream?: boolean;
+	tools?: ToolDefinition[];
 }
 
 export interface ChatResponse {
@@ -20,6 +22,7 @@ export interface ChatResponse {
 		outputTokens: number;
 	};
 	finishReason?: string;
+	toolUses?: ToolUseBlock[];
 }
 
 export interface ModelInfo {
@@ -69,4 +72,21 @@ export interface LLMProvider {
 	 * リクエストヘッダーを構築
 	 */
 	buildHeaders(apiKey: string): Record<string, string>;
+}
+
+/** Anthropic Tool Use API 用の型定義 */
+export interface ToolDefinition {
+	name: string;
+	description: string;
+	input_schema: {
+		type: "object";
+		properties: Record<string, unknown>;
+		required?: string[];
+	};
+}
+
+export interface ToolUseBlock {
+	id: string;
+	name: string;
+	input: Record<string, unknown>;
 }

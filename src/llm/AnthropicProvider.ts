@@ -22,11 +22,16 @@ export class AnthropicProvider implements LLMProvider {
 	];
 
 	buildRequestBody(params: ChatRequest): Record<string, unknown> {
-		const messages: Array<Record<string, string>> = [];
+		const messages: Array<Record<string, unknown>> = [];
 
 		for (const msg of params.messages) {
 			if (msg.role !== "system") {
-				messages.push({ role: msg.role, content: msg.content });
+				// rawContent があれば content 配列として使用（Tool Use対応）
+				if (msg.rawContent) {
+					messages.push({ role: msg.role, content: msg.rawContent });
+				} else {
+					messages.push({ role: msg.role, content: msg.content });
+				}
 			}
 		}
 
@@ -39,6 +44,11 @@ export class AnthropicProvider implements LLMProvider {
 		// Anthropicはsystemプロンプトをトップレベルに配置
 		if (params.systemPrompt) {
 			body.system = params.systemPrompt;
+		}
+
+		// Tool Use definitions
+		if (params.tools && params.tools.length > 0) {
+			body.tools = params.tools;
 		}
 
 		if (params.temperature !== undefined) {
