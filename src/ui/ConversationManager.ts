@@ -24,7 +24,7 @@ interface ConversationIndex {
 	}>;
 }
 
-const CONVERSATIONS_FOLDER = ".obsidian/plugins/obsidian-llm-assistant/conversations";
+const CONVERSATIONS_FOLDER = ".obsidian/plugins/llm-assistant/conversations";
 const INDEX_FILE = `${CONVERSATIONS_FOLDER}/index.json`;
 
 /**

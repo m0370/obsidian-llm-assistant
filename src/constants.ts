@@ -1,6 +1,6 @@
 import { t } from "./i18n";
 
-export const PLUGIN_ID = "obsidian-llm-assistant";
+export const PLUGIN_ID = "llm-assistant";
 export const VIEW_TYPE_CHAT = "llm-assistant-chat-view";
 export const DISPLAY_NAME = "LLM Assistant";
 
