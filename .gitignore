@@ -19,5 +19,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# AIツール設定
+.claude/
+.gemini/
+
 # テストカバレッジ
 coverage/
