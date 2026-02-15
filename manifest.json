@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-llm-assistant",
 	"name": "LLM Assistant",
-	"version": "0.1.11",
+	"version": "0.1.12",
 	"minAppVersion": "1.11.4",
 	"description": "LLM-powered writing assistant with mobile-first design. Supports Claude, GPT, and Gemini.",
 	"author": "m0370",
