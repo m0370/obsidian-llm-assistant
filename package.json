@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-llm-assistant",
-	"version": "0.1.9",
+	"version": "0.1.10",
 	"description": "LLM-powered writing assistant for Obsidian with mobile-first design",
 	"main": "main.js",
 	"scripts": {
