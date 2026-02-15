@@ -1,10 +1,8 @@
-import { setIcon } from "obsidian";
 import { t } from "../i18n";
 
 export class ChatInput {
 	private containerEl: HTMLElement;
 	private textareaEl: HTMLTextAreaElement;
-	private sendBtn: HTMLButtonElement;
 	private onSend: (text: string) => void;
 	private isComposing = false;
 	private viewportHandler: (() => void) | null = null;
@@ -55,47 +53,48 @@ export class ChatInput {
 				this.textareaEl.scrollIntoView({ block: "end", behavior: "smooth" });
 			}, 300);
 		});
-
-		// 送信ボタン
-		this.sendBtn = wrapper.createEl("button", {
-			cls: "llm-send-btn",
-			attr: { "aria-label": t("input.send") },
-		});
-		setIcon(this.sendBtn, "send");
-		this.sendBtn.addEventListener("click", () => {
-			this.send();
-		});
 	}
 
 	/**
 	 * visualViewport APIでiOSキーボード表示時のレイアウト調整
+	 * getBoundingClientRect()で実際のオーバーフロー量を計算
 	 */
 	private setupKeyboardHandler(): void {
 		if (!window.visualViewport) return;
+		const vv = window.visualViewport;
 
 		this.viewportHandler = () => {
-			const vv = window.visualViewport!;
-			const keyboardHeight = window.innerHeight - vv.height;
 			const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
 			if (!chatView) return;
 
-			if (keyboardHeight > 50) {
-				// キーボード表示中: ビューの高さをビジュアルビューポートに合わせる
-				chatView.style.height = `${vv.height}px`;
+			const viewRect = chatView.getBoundingClientRect();
+			const visibleBottom = vv.offsetTop + vv.height;
+			const overflow = viewRect.bottom - visibleBottom;
+
+			if (overflow > 50) {
+				const newHeight = viewRect.height - overflow;
+				chatView.style.height = `${newHeight}px`;
+				chatView.style.maxHeight = `${newHeight}px`;
+				chatView.classList.add("keyboard-open");
+				requestAnimationFrame(() => {
+					this.textareaEl.scrollIntoView({ block: "end", behavior: "smooth" });
+				});
 			} else {
-				// キーボード非表示: 通常のレイアウトに戻す
-				chatView.style.height = "100%";
+				chatView.style.height = "";
+				chatView.style.maxHeight = "";
+				chatView.classList.remove("keyboard-open");
 			}
 		};
 
-		window.visualViewport.addEventListener("resize", this.viewportHandler);
+		vv.addEventListener("resize", this.viewportHandler);
+		vv.addEventListener("scroll", this.viewportHandler);
 	}
 
 	private autoExpand(): void {
 		const textarea = this.textareaEl;
 		textarea.style.height = "auto";
 		const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-		const maxHeight = viewportHeight * 0.3; // ビジュアルビューポートの30%が上限
+		const maxHeight = viewportHeight * 0.25; // ビジュアルビューポートの25%が上限
 		const scrollHeight = textarea.scrollHeight;
 		textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
 		textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden";
@@ -110,6 +109,13 @@ export class ChatInput {
 		this.textareaEl.focus();
 	}
 
+	/**
+	 * 外部から送信をトリガー（アクションバーのSendボタン用）
+	 */
+	triggerSend(): void {
+		this.send();
+	}
+
 	setValue(text: string): void {
 		this.textareaEl.value = text;
 		this.autoExpand();
@@ -121,23 +127,24 @@ export class ChatInput {
 
 	disable(): void {
 		this.textareaEl.disabled = true;
-		this.sendBtn.disabled = true;
 	}
 
 	enable(): void {
 		this.textareaEl.disabled = false;
-		this.sendBtn.disabled = false;
 	}
 
 	destroy(): void {
 		if (this.viewportHandler && window.visualViewport) {
 			window.visualViewport.removeEventListener("resize", this.viewportHandler);
+			window.visualViewport.removeEventListener("scroll", this.viewportHandler);
 			this.viewportHandler = null;
 		}
 		// キーボードで変更した高さをリセット
 		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
 		if (chatView) {
-			chatView.style.height = "100%";
+			chatView.style.height = "";
+			chatView.style.maxHeight = "";
+			chatView.classList.remove("keyboard-open");
 		}
 	}
 }
