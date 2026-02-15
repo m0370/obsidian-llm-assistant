@@ -140,7 +140,6 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 
 			setting.addText((text) => {
 				text.inputEl.type = "password";
-				text.inputEl.style.width = "100%";
 				text.setPlaceholder(`${provider.name} API Key`);
 
 				// 現在のAPI鍵を読み込み

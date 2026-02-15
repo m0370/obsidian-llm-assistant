@@ -959,51 +959,60 @@
 
 /* --- 設定画面: APIキー入力欄のレスポンシブ対応 --- */
 
-/* タブレット・モバイルでAPIキー設定を縦積みに */
+/*
+ * Obsidianデフォルト:
+ *   .setting-item: display:flex; flex-wrap:nowrap
+ *   .setting-item-info: flex:1 (= flex:1 1 0%)
+ *   .setting-item-control: flex-shrink:0
+ *
+ * APIキー行は input + 2ボタンで幅を食うため、
+ * 縦積みレイアウトに変更して入力欄を確保する。
+ */
 .llm-apikey-setting.setting-item {
-	flex-wrap: wrap;
+	flex-direction: column;
+	align-items: stretch;
 }
 
-.llm-apikey-setting .setting-item-info {
-	flex-basis: 100%;
-	max-width: 100%;
+.llm-apikey-setting.setting-item .setting-item-info {
+	flex: 0 0 auto;
 }
 
-.llm-apikey-setting .setting-item-control {
-	flex-basis: 100%;
-	max-width: 100%;
+.llm-apikey-setting.setting-item .setting-item-control {
+	flex: 0 0 auto;
 	flex-wrap: wrap;
 	gap: 6px;
-	padding-top: 8px;
+	padding-top: 4px;
 }
 
-.llm-apikey-setting .setting-item-control input[type="password"],
-.llm-apikey-setting .setting-item-control input[type="text"] {
+/* 入力欄をフル幅に、ボタンは次の行に回り込み */
+.llm-apikey-setting.setting-item .setting-item-control input[type="password"],
+.llm-apikey-setting.setting-item .setting-item-control input[type="text"] {
 	flex: 1 1 100%;
 	min-width: 0;
+	width: 100%;
 }
 
 /* デスクトップ（十分な幅がある場合）は従来の横並びに復帰 */
 @media (min-width: 900px) {
 	.llm-apikey-setting.setting-item {
-		flex-wrap: nowrap;
+		flex-direction: row;
+		align-items: center;
 	}
 
-	.llm-apikey-setting .setting-item-info {
-		flex-basis: auto;
-		max-width: none;
+	.llm-apikey-setting.setting-item .setting-item-info {
+		flex: 1 1 0%;
 	}
 
-	.llm-apikey-setting .setting-item-control {
-		flex-basis: auto;
-		max-width: none;
+	.llm-apikey-setting.setting-item .setting-item-control {
+		flex: 0 0 auto;
 		flex-wrap: nowrap;
 		padding-top: 0;
 	}
 
-	.llm-apikey-setting .setting-item-control input[type="password"],
-	.llm-apikey-setting .setting-item-control input[type="text"] {
+	.llm-apikey-setting.setting-item .setting-item-control input[type="password"],
+	.llm-apikey-setting.setting-item .setting-item-control input[type="text"] {
 		flex: 1 1 auto;
 		min-width: 200px;
+		width: auto;
 	}
 }
