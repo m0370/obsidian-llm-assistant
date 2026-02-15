@@ -36,7 +36,9 @@ export async function sendRequest(
 	onToken?: (token: string) => void,
 ): Promise<ChatResponse> {
 	const trimmedKey = apiKey.trim();
-	const wantStream = params.stream !== false && onToken !== undefined;
+	// Tool Use時はストリーミングを無効化（SSEパースではtool_callsを抽出できないため）
+	const hasTools = params.tools && params.tools.length > 0;
+	const wantStream = params.stream !== false && onToken !== undefined && !hasTools;
 
 	if (wantStream && provider.supportsCORS) {
 		if (Platform.isDesktop) {
