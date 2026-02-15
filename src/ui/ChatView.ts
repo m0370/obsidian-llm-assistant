@@ -60,7 +60,6 @@ export class ChatView extends ItemView {
 	private currentConversationId: string | null = null;
 	private messages: MessageData[] = [];
 	private isGenerating = false;
-	private actionBarSendBtn: HTMLButtonElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -109,21 +108,18 @@ export class ChatView extends ItemView {
 			}
 		});
 
-		// ボトムエリア（コンテキスト + 入力 + アクションバー）
+		// ボトムエリア（コンテキスト + 入力）
 		const bottomArea = container.createDiv({ cls: "llm-bottom-area" });
 
 		// コンテキストバー（添付ノート表示）
 		this.contextBar = bottomArea.createDiv({ cls: "llm-context-bar" });
 		this.contextBar.style.display = "none";
 
-		// 入力エリア
+		// 入力エリア（textarea + Sendボタンが1行に統合）
 		const inputContainer = bottomArea.createDiv({ cls: "llm-chat-input-container" });
 		this.chatInput = new ChatInput(inputContainer, (text: string) => {
 			this.handleSend(text);
 		});
-
-		// アクションバー（Gemini風）
-		this.buildActionBar(bottomArea);
 	}
 
 	async onClose(): Promise<void> {
@@ -143,7 +139,7 @@ export class ChatView extends ItemView {
 			this.plugin.saveSettings();
 		});
 
-		// 右側: 新規チャットボタンのみ
+		// 右側: 新規チャット + ⊕メニュー
 		const headerActions = this.headerEl.createDiv({ cls: "llm-header-actions" });
 
 		const newChatBtn = headerActions.createEl("button", {
@@ -155,6 +151,16 @@ export class ChatView extends ItemView {
 			try { await this.saveCurrentConversation(); } catch { /* ignore */ }
 			this.clearChat();
 			this.chatInput.focus();
+		});
+
+		// ⊕ 多機能メニューボタン
+		const menuBtn = headerActions.createEl("button", {
+			cls: "llm-header-btn",
+			attr: { "aria-label": t("actionBar.more") },
+		});
+		setIcon(menuBtn, "plus-circle");
+		menuBtn.addEventListener("click", (evt) => {
+			this.showPlusMenu(evt);
 		});
 	}
 
@@ -177,50 +183,6 @@ export class ChatView extends ItemView {
 					option.selected = true;
 				}
 			});
-		});
-	}
-
-	private buildActionBar(parent: HTMLElement): void {
-		const actionBar = parent.createDiv({ cls: "llm-action-bar" });
-
-		// 左側: ➕ と ⚙
-		const left = actionBar.createDiv({ cls: "llm-action-bar-left" });
-
-		// ➕ メニューボタン
-		const plusBtn = left.createEl("button", {
-			cls: "llm-action-btn",
-			attr: { "aria-label": t("actionBar.more") },
-		});
-		setIcon(plusBtn, "plus-circle");
-		plusBtn.addEventListener("click", (evt) => {
-			this.showPlusMenu(evt);
-		});
-
-		// ⚙ 設定ボタン
-		const settingsBtn = left.createEl("button", {
-			cls: "llm-action-btn",
-			attr: { "aria-label": t("header.settings") },
-		});
-		setIcon(settingsBtn, "settings");
-		settingsBtn.addEventListener("click", () => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const setting = (this.app as any).setting;
-			if (setting) {
-				setting.open();
-				setting.openTabById("obsidian-llm-assistant");
-			}
-		});
-
-		// 右側: Send ボタン
-		const right = actionBar.createDiv({ cls: "llm-action-bar-right" });
-
-		this.actionBarSendBtn = right.createEl("button", {
-			cls: "llm-send-btn",
-			attr: { "aria-label": t("input.send") },
-		});
-		setIcon(this.actionBarSendBtn, "send");
-		this.actionBarSendBtn.addEventListener("click", () => {
-			this.chatInput.triggerSend();
 		});
 	}
 
@@ -302,6 +264,22 @@ export class ChatView extends ItemView {
 						this.conversationManager,
 						(conversation) => this.loadConversation(conversation),
 					).open();
+				});
+		});
+
+		menu.addSeparator();
+
+		// ⚙ 設定
+		menu.addItem((item) => {
+			item.setTitle(t("header.settings"))
+				.setIcon("settings")
+				.onClick(() => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const setting = (this.app as any).setting;
+					if (setting) {
+						setting.open();
+						setting.openTabById("obsidian-llm-assistant");
+					}
 				});
 		});
 
@@ -416,7 +394,7 @@ export class ChatView extends ItemView {
 		// 生成開始
 		this.isGenerating = true;
 		this.chatInput.disable();
-		this.actionBarSendBtn.disabled = true;
+		this.chatInput.disableSend();
 
 		// 生成中インジケーター
 		const generatingEl = this.showGeneratingIndicator();
@@ -491,7 +469,7 @@ export class ChatView extends ItemView {
 			generatingEl.remove();
 			this.isGenerating = false;
 			this.chatInput.enable();
-			this.actionBarSendBtn.disabled = false;
+			this.chatInput.enableSend();
 			this.chatInput.focus();
 			this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
 			// 自動保存
