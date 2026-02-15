@@ -1,4 +1,4 @@
-import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import { VIEW_TYPE_CHAT, DISPLAY_NAME, PROVIDERS } from "../constants";
 import type LLMAssistantPlugin from "../main";
 import type { LLMProvider, Message } from "../llm/LLMProvider";
@@ -30,6 +30,7 @@ export class ChatView extends ItemView {
 	private currentConversationId: string | null = null;
 	private messages: MessageData[] = [];
 	private isGenerating = false;
+	private actionBarSendBtn: HTMLButtonElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -78,19 +79,21 @@ export class ChatView extends ItemView {
 			}
 		});
 
+		// ボトムエリア（コンテキスト + 入力 + アクションバー）
+		const bottomArea = container.createDiv({ cls: "llm-bottom-area" });
+
 		// コンテキストバー（添付ノート表示）
-		this.contextBar = container.createDiv({ cls: "llm-context-bar" });
+		this.contextBar = bottomArea.createDiv({ cls: "llm-context-bar" });
 		this.contextBar.style.display = "none";
 
-		// ツールバー
-		const toolbar = container.createDiv({ cls: "llm-toolbar" });
-		this.buildToolbar(toolbar);
-
 		// 入力エリア
-		const inputContainer = container.createDiv({ cls: "llm-chat-input-container" });
+		const inputContainer = bottomArea.createDiv({ cls: "llm-chat-input-container" });
 		this.chatInput = new ChatInput(inputContainer, (text: string) => {
 			this.handleSend(text);
 		});
+
+		// アクションバー（Gemini風）
+		this.buildActionBar(bottomArea);
 	}
 
 	async onClose(): Promise<void> {
@@ -110,39 +113,9 @@ export class ChatView extends ItemView {
 			this.plugin.saveSettings();
 		});
 
-		// 右側ボタン群
+		// 右側: 新規チャットボタンのみ
 		const headerActions = this.headerEl.createDiv({ cls: "llm-header-actions" });
 
-		// 履歴ボタン
-		const historyBtn = headerActions.createEl("button", {
-			cls: "llm-header-btn",
-			attr: { "aria-label": t("header.history") },
-		});
-		setIcon(historyBtn, "history");
-		historyBtn.addEventListener("click", () => {
-			new ConversationListModal(
-				this.app,
-				this.conversationManager,
-				(conversation) => this.loadConversation(conversation),
-			).open();
-		});
-
-		// 設定ボタン
-		const settingsBtn = headerActions.createEl("button", {
-			cls: "llm-header-btn",
-			attr: { "aria-label": t("header.settings") },
-		});
-		setIcon(settingsBtn, "settings");
-		settingsBtn.addEventListener("click", () => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const setting = (this.app as any).setting;
-			if (setting) {
-				setting.open();
-				setting.openTabById("obsidian-llm-assistant");
-			}
-		});
-
-		// 新規チャットボタン
 		const newChatBtn = headerActions.createEl("button", {
 			cls: "llm-header-btn",
 			attr: { "aria-label": t("header.newChat") },
@@ -177,71 +150,132 @@ export class ChatView extends ItemView {
 		});
 	}
 
-	private buildToolbar(toolbar: HTMLElement): void {
-		// アクティブノート参照ボタン
-		const attachActiveBtn = toolbar.createEl("button", {
-			cls: "llm-toolbar-btn",
-			attr: { "aria-label": t("toolbar.attachActive") },
+	private buildActionBar(parent: HTMLElement): void {
+		const actionBar = parent.createDiv({ cls: "llm-action-bar" });
+
+		// 左側: ➕ と ⚙
+		const left = actionBar.createDiv({ cls: "llm-action-bar-left" });
+
+		// ➕ メニューボタン
+		const plusBtn = left.createEl("button", {
+			cls: "llm-action-btn",
+			attr: { "aria-label": t("actionBar.more") },
 		});
-		setIcon(attachActiveBtn, "paperclip");
-		attachActiveBtn.addEventListener("click", async () => {
-			const activeFile = this.plugin.vaultReader.getActiveFile();
-			if (!activeFile) {
-				new Notice(t("notice.noActiveNote"));
-				return;
-			}
-			const entry = await this.noteContext.addFile(activeFile);
-			if (entry) {
-				this.updateContextBar();
-				new Notice(t("notice.attached", { name: activeFile.basename }));
-			} else {
-				new Notice(t("notice.alreadyAttachedOrLimit"));
-			}
+		setIcon(plusBtn, "plus-circle");
+		plusBtn.addEventListener("click", (evt) => {
+			this.showPlusMenu(evt);
 		});
 
-		// ファイルピッカーボタン
-		const pickerBtn = toolbar.createEl("button", {
-			cls: "llm-toolbar-btn",
-			attr: { "aria-label": t("toolbar.pickFile") },
+		// ⚙ 設定ボタン
+		const settingsBtn = left.createEl("button", {
+			cls: "llm-action-btn",
+			attr: { "aria-label": t("header.settings") },
 		});
-		setIcon(pickerBtn, "folder");
-		pickerBtn.addEventListener("click", () => {
-			new FilePickerModal(this.app, async (file) => {
-				const entry = await this.noteContext.addFile(file);
-				if (entry) {
-					this.updateContextBar();
-					new Notice(t("notice.attached", { name: file.basename }));
-				} else {
-					new Notice(t("notice.alreadyAttachedOrLimit"));
-				}
-			}).open();
-		});
-
-		// コピーボタン
-		const copyBtn = toolbar.createEl("button", {
-			cls: "llm-toolbar-btn",
-			attr: { "aria-label": t("toolbar.copy") },
-		});
-		setIcon(copyBtn, "copy");
-		copyBtn.addEventListener("click", () => {
-			const lastAssistant = [...this.messages]
-				.reverse()
-				.find((m) => m.role === "assistant");
-			if (lastAssistant) {
-				navigator.clipboard.writeText(lastAssistant.content);
-				new Notice(t("notice.copied"));
+		setIcon(settingsBtn, "settings");
+		settingsBtn.addEventListener("click", () => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const setting = (this.app as any).setting;
+			if (setting) {
+				setting.open();
+				setting.openTabById("obsidian-llm-assistant");
 			}
 		});
 
-		// ノート挿入ボタン
-		const insertBtn = toolbar.createEl("button", {
-			cls: "llm-toolbar-btn",
-			attr: { "aria-label": t("toolbar.insertToNote") },
+		// 右側: Send ボタン
+		const right = actionBar.createDiv({ cls: "llm-action-bar-right" });
+
+		this.actionBarSendBtn = right.createEl("button", {
+			cls: "llm-send-btn",
+			attr: { "aria-label": t("input.send") },
 		});
-		setIcon(insertBtn, "file-text");
-		insertBtn.addEventListener("click", () => {
-			this.insertToActiveNote();
+		setIcon(this.actionBarSendBtn, "send");
+		this.actionBarSendBtn.addEventListener("click", () => {
+			this.chatInput.triggerSend();
 		});
+	}
+
+	private showPlusMenu(evt: MouseEvent | TouchEvent): void {
+		const menu = new Menu();
+
+		// 📎 アクティブノートを添付
+		menu.addItem((item) => {
+			item.setTitle(t("toolbar.attachActive"))
+				.setIcon("paperclip")
+				.onClick(async () => {
+					const activeFile = this.plugin.vaultReader.getActiveFile();
+					if (!activeFile) {
+						new Notice(t("notice.noActiveNote"));
+						return;
+					}
+					const entry = await this.noteContext.addFile(activeFile);
+					if (entry) {
+						this.updateContextBar();
+						new Notice(t("notice.attached", { name: activeFile.basename }));
+					} else {
+						new Notice(t("notice.alreadyAttachedOrLimit"));
+					}
+				});
+		});
+
+		// 📁 ファイルを選択
+		menu.addItem((item) => {
+			item.setTitle(t("toolbar.pickFile"))
+				.setIcon("folder")
+				.onClick(() => {
+					new FilePickerModal(this.app, async (file) => {
+						const entry = await this.noteContext.addFile(file);
+						if (entry) {
+							this.updateContextBar();
+							new Notice(t("notice.attached", { name: file.basename }));
+						} else {
+							new Notice(t("notice.alreadyAttachedOrLimit"));
+						}
+					}).open();
+				});
+		});
+
+		menu.addSeparator();
+
+		// 📋 応答をコピー
+		menu.addItem((item) => {
+			item.setTitle(t("toolbar.copy"))
+				.setIcon("copy")
+				.onClick(() => {
+					const lastAssistant = [...this.messages]
+						.reverse()
+						.find((m) => m.role === "assistant");
+					if (lastAssistant) {
+						navigator.clipboard.writeText(lastAssistant.content);
+						new Notice(t("notice.copied"));
+					}
+				});
+		});
+
+		// 📄 ノートに挿入
+		menu.addItem((item) => {
+			item.setTitle(t("toolbar.insertToNote"))
+				.setIcon("file-text")
+				.onClick(() => {
+					this.insertToActiveNote();
+				});
+		});
+
+		menu.addSeparator();
+
+		// 🕐 会話履歴
+		menu.addItem((item) => {
+			item.setTitle(t("header.history"))
+				.setIcon("history")
+				.onClick(() => {
+					new ConversationListModal(
+						this.app,
+						this.conversationManager,
+						(conversation) => this.loadConversation(conversation),
+					).open();
+				});
+		});
+
+		menu.showAtMouseEvent(evt as MouseEvent);
 	}
 
 	private updateContextBar(): void {
@@ -352,6 +386,7 @@ export class ChatView extends ItemView {
 		// 生成開始
 		this.isGenerating = true;
 		this.chatInput.disable();
+		this.actionBarSendBtn.disabled = true;
 
 		// 生成中インジケーター
 		const generatingEl = this.showGeneratingIndicator();
@@ -416,6 +451,7 @@ export class ChatView extends ItemView {
 			generatingEl.remove();
 			this.isGenerating = false;
 			this.chatInput.enable();
+			this.actionBarSendBtn.disabled = false;
 			this.chatInput.focus();
 			this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
 			// 自動保存

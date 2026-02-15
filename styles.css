@@ -219,40 +219,63 @@
 	}
 }
 
-/* --- ツールバー --- */
+/* --- ボトムエリア（入力 + アクションバーのラッパー） --- */
 
-.llm-toolbar {
+.llm-bottom-area {
+	flex-shrink: 0;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	z-index: 10;
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* --- アクションバー（Gemini風） --- */
+
+.llm-action-bar {
 	display: flex;
 	align-items: center;
 	padding: 4px 8px;
-	border-top: 1px solid var(--background-modifier-border);
-	flex-shrink: 0;
 	gap: 2px;
 }
 
-.llm-toolbar-btn {
+.llm-action-bar-left {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.llm-action-bar-right {
+	display: flex;
+	align-items: center;
+	margin-left: auto;
+}
+
+.llm-action-btn {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	width: 44px;
-	height: 36px;
+	height: 44px;
 	border: none;
 	background: transparent;
 	color: var(--text-muted);
-	font-size: 16px;
 	cursor: pointer;
 	border-radius: 6px;
 	padding: 0;
 }
 
-.llm-toolbar-btn svg {
-	width: 16px;
-	height: 16px;
-}
-
-.llm-toolbar-btn:hover {
+.llm-action-btn:hover {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
+}
+
+.llm-action-btn:active {
+	background: var(--background-modifier-active-hover);
+}
+
+.llm-action-btn svg {
+	width: 18px;
+	height: 18px;
 }
 
 /* --- コンテキストバー（添付ノート表示） --- */
@@ -312,10 +335,7 @@
 
 .llm-chat-input-container {
 	flex-shrink: 0;
-	border-top: 1px solid var(--background-modifier-border);
-	padding-bottom: env(safe-area-inset-bottom, 0px);
 	background: var(--background-primary);
-	z-index: 10;
 }
 
 .llm-chat-input {
@@ -414,14 +434,14 @@
 		height: 16px;
 	}
 
-	.llm-toolbar-btn {
+	.llm-action-btn {
 		width: 32px;
-		height: 28px;
+		height: 32px;
 	}
 
-	.llm-toolbar-btn svg {
-		width: 14px;
-		height: 14px;
+	.llm-action-btn svg {
+		width: 16px;
+		height: 16px;
 	}
 
 	.llm-header {
@@ -472,6 +492,11 @@
 /* ============================================
    iPhone 固有対応
    ============================================ */
+
+/* keyboard-open状態: スペース節約 */
+.llm-assistant-view.keyboard-open .llm-context-bar {
+	display: none !important;
+}
 
 /* SafeArea — Obsidianがすでにハンドルしているため最小限に */
 
@@ -577,7 +602,7 @@
 	min-height: 36px;
 }
 
-.llm-assistant-view.llm-font-small .llm-toolbar {
+.llm-assistant-view.llm-font-small .llm-action-bar {
 	padding: 2px 6px;
 }
 

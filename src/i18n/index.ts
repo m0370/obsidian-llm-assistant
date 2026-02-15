@@ -25,6 +25,9 @@ const translations: Record<Locale, Record<string, string>> = {
 		"toolbar.copy": "Copy",
 		"toolbar.insertToNote": "Insert to note",
 
+		// Action bar
+		"actionBar.more": "More actions",
+
 		// Chat input
 		"input.placeholder": "Type a message...",
 		"input.send": "Send",
@@ -194,6 +197,9 @@ const translations: Record<Locale, Record<string, string>> = {
 		"toolbar.pickFile": "ノートを選択",
 		"toolbar.copy": "コピー",
 		"toolbar.insertToNote": "ノートに挿入",
+
+		// Action bar
+		"actionBar.more": "その他のアクション",
 
 		// Chat input
 		"input.placeholder": "メッセージを入力...",
