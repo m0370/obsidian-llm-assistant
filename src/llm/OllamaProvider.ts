@@ -80,4 +80,16 @@ export class OllamaProvider implements LLMProvider {
 			return false;
 		}
 	}
+
+	async fetchModels(_apiKey: string): Promise<ModelInfo[]> {
+		const response = await fetch("http://localhost:11434/api/tags");
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const data = await response.json();
+		const models = data.models as Array<Record<string, unknown>>;
+		return (models || []).map(m => ({
+			id: (m.name as string) || "",
+			name: (m.name as string) || "",
+			contextWindow: 128000,
+		}));
+	}
 }

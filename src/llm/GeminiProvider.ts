@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo } from "./LLMProvider";
+import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo, Message, ToolUseBlock, ToolResult } from "./LLMProvider";
 
 /**
  * Google Gemini プロバイダー
@@ -12,7 +12,9 @@ export class GeminiProvider implements LLMProvider {
 	name = "Google Gemini";
 	requiresApiKey = true;
 	supportsCORS = true;
+	supportsToolUse = true;
 	apiEndpoint = "https://generativelanguage.googleapis.com/v1beta/";
+	apiKeyUrl = "https://aistudio.google.com/apikey";
 
 	models: ModelInfo[] = [
 		{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000 },
@@ -37,10 +39,15 @@ export class GeminiProvider implements LLMProvider {
 
 		for (const msg of params.messages) {
 			if (msg.role === "system") continue;
-			contents.push({
-				role: msg.role === "assistant" ? "model" : "user",
-				parts: [{ text: msg.content }],
-			});
+			if (msg.rawContent) {
+				// Tool Use: rawContent contains the full pre-formatted content object
+				contents.push(msg.rawContent as Record<string, unknown>);
+			} else {
+				contents.push({
+					role: msg.role === "assistant" ? "model" : "user",
+					parts: [{ text: msg.content }],
+				});
+			}
 		}
 
 		const body: Record<string, unknown> = { contents };
@@ -50,6 +57,17 @@ export class GeminiProvider implements LLMProvider {
 			body.systemInstruction = {
 				parts: [{ text: params.systemPrompt }],
 			};
+		}
+
+		// Convert common ToolDefinition to Gemini functionDeclarations format
+		if (params.tools && params.tools.length > 0) {
+			body.tools = [{
+				functionDeclarations: params.tools.map(tool => ({
+					name: tool.name,
+					description: tool.description,
+					parameters: tool.input_schema,
+				})),
+			}];
 		}
 
 		// 生成設定
@@ -70,6 +88,29 @@ export class GeminiProvider implements LLMProvider {
 	buildHeaders(_apiKey: string): Record<string, string> {
 		// Gemini APIはキーをURLパラメータで渡すため、ヘッダーには含めない
 		return {};
+	}
+
+	buildAssistantToolUseMessage(content: string, toolUses: ToolUseBlock[]): Message {
+		const parts: unknown[] = [];
+		if (content) parts.push({ text: content });
+		for (const tu of toolUses) {
+			parts.push({ functionCall: { name: tu.name, args: tu.input } });
+		}
+		return {
+			role: "assistant",
+			content: content || "",
+			rawContent: { role: "model", parts },
+		};
+	}
+
+	buildToolResultMessages(results: ToolResult[]): Message[] {
+		const parts = results.map(r => ({
+			functionResponse: {
+				name: r.name,
+				response: { content: r.content },
+			},
+		}));
+		return [{ role: "user", content: "", rawContent: { role: "user", parts } }];
 	}
 
 	async *chat(params: ChatRequest, apiKey: string): AsyncGenerator<string, ChatResponse, unknown> {
@@ -93,5 +134,26 @@ export class GeminiProvider implements LLMProvider {
 		if (response.status === 200) return true;
 		if (response.status === 400 || response.status === 401 || response.status === 403) return false;
 		throw new Error(`HTTP ${response.status}`);
+	}
+
+	async fetchModels(apiKey: string): Promise<ModelInfo[]> {
+		const trimmed = apiKey.trim();
+		const url = `${this.apiEndpoint}models?key=${trimmed}`;
+		const response = await requestUrl({ url, method: "GET", throw: false });
+		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+
+		const models = response.json.models as Array<Record<string, unknown>>;
+		return models
+			.filter(m => {
+				const methods = m.supportedGenerationMethods as string[] | undefined;
+				return methods?.includes("generateContent");
+			})
+			.map(m => ({
+				id: ((m.name as string) || "").replace("models/", ""),
+				name: (m.displayName as string) || (m.name as string) || "",
+				contextWindow: (m.inputTokenLimit as number) || 32000,
+			}))
+			.filter(m => m.id.startsWith("gemini"))
+			.sort((a, b) => b.id.localeCompare(a.id));
 	}
 }

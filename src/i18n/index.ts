@@ -186,6 +186,13 @@ const translations: Record<Locale, Record<string, string>> = {
 
 		// Tool Use (Anthropic)
 		"context.toolUseInstruction": "You have access to the user's Obsidian vault through tools. You can read any file using the vault_read tool and propose edits using the vault_write tool.\n\nIMPORTANT BEHAVIORS:\n- When the user mentions or asks about a specific note or file, proactively use vault_read to read it — do NOT ask for permission first.\n- When asked to edit, modify, fix, proofread, reformat, or create a file, ALWAYS read it first with vault_read, then use vault_write with the complete modified content.\n- You can read multiple files in sequence to gather information.\n- When referencing vault files in your response, use [[filename]] wikilink format for clickable links.\n- After reading a file, mention which file(s) you referenced (e.g. \"Based on [[My Note]], ...\").",
+
+		// Model refresh
+		"settings.refreshModels": "Refresh",
+		"settings.refreshingModels": "Refreshing...",
+		"notice.modelsRefreshed": "Model list updated ({count} models)",
+		"notice.modelsRefreshFailed": "Failed to refresh models: {message}",
+		"notice.modelsRefreshNoKey": "API key required to refresh models",
 	},
 
 	ja: {
@@ -362,6 +369,13 @@ const translations: Record<Locale, Record<string, string>> = {
 
 		// Tool Use (Anthropic)
 		"context.toolUseInstruction": "ユーザーのObsidian Vaultにツールを通じてアクセスできます。vault_readツールでファイルを読み取り、vault_writeツールで編集を提案できます。\n\n重要な振る舞い:\n- ユーザーが特定のノートやファイルに言及したり質問した場合、許可を求めずに積極的にvault_readで読み取ってください。\n- 編集、修正、校正、整形、作成を求められた場合、必ず最初にvault_readで読み取り、その後vault_writeで修正後の全内容を提案してください。\n- 情報を集めるために複数のファイルを順に読み取ることができます。\n- 回答中でVault内のファイルに言及する場合は、[[ファイル名]]のwikilink形式を使ってください。\n- ファイルを読んだ後は、どのファイルを参照したかを明示してください（例: 「[[私のノート]]によると…」）。",
+
+		// Model refresh
+		"settings.refreshModels": "更新",
+		"settings.refreshingModels": "更新中...",
+		"notice.modelsRefreshed": "モデル一覧を更新しました（{count}件）",
+		"notice.modelsRefreshFailed": "モデル一覧の更新に失敗: {message}",
+		"notice.modelsRefreshNoKey": "モデル一覧の更新にはAPIキーが必要です",
 	},
 };
 

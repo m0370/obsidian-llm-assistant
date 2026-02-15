@@ -1,7 +1,7 @@
 import { ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
-import { VIEW_TYPE_CHAT, DISPLAY_NAME, PROVIDERS } from "../constants";
+import { VIEW_TYPE_CHAT, DISPLAY_NAME } from "../constants";
 import type LLMAssistantPlugin from "../main";
-import type { LLMProvider, Message, ToolDefinition } from "../llm/LLMProvider";
+import type { LLMProvider, Message, ToolDefinition, ToolResult } from "../llm/LLMProvider";
 import { sendRequest } from "../llm/streaming";
 import { NoteContext } from "../vault/NoteContext";
 import { ConversationManager, type Conversation } from "./ConversationManager";
@@ -388,8 +388,7 @@ export class ChatView extends ItemView {
 		// API鍵を取得（SecretManager経由）
 		const apiKey = await this.getApiKey(provider);
 		if (!apiKey) {
-			const providerConfig = PROVIDERS.find(p => p.id === provider.id);
-			const apiKeyUrl = providerConfig?.apiKeyUrl;
+			const apiKeyUrl = provider.apiKeyUrl;
 			if (apiKeyUrl) {
 				this.showError(t("error.apiKeyNotSetWithUrl", { name: provider.name, url: apiKeyUrl }));
 			} else {
@@ -417,7 +416,7 @@ export class ChatView extends ItemView {
 
 		try {
 			// システムプロンプトを構築
-			const systemPrompt = await this.buildSystemPrompt(text, provider.id);
+			const systemPrompt = await this.buildSystemPrompt(text, provider);
 
 			// 会話履歴をMessage[]形式に変換
 			const chatMessages: Message[] = this.messages
@@ -432,8 +431,8 @@ export class ChatView extends ItemView {
 			let finalContent: string;
 			let writeOperations: Array<{path: string, content: string}>;
 
-			if (provider.id === "anthropic") {
-				// Anthropic: Tool Use API を使用
+			if (provider.supportsToolUse) {
+				// Tool Use API を使用（Anthropic, OpenAI, Gemini, OpenRouter）
 				const result = await this.callLLMWithToolUse(
 					provider, chatMessages, systemPrompt, apiKey,
 					assistantMsg, messageComponent,
@@ -441,7 +440,7 @@ export class ChatView extends ItemView {
 				finalContent = result.text;
 				writeOperations = result.writeProposals;
 			} else {
-				// 他プロバイダー: テキストタグ方式を維持
+				// テキストタグ方式（Ollama, Custom等）
 				const rawContent = await this.callLLMWithFileReading(
 					provider, chatMessages, systemPrompt, apiKey,
 					assistantMsg, messageComponent,
@@ -487,7 +486,7 @@ export class ChatView extends ItemView {
 	/**
 	 * システムプロンプトを構築（コンテキスト、アクティブノート、wikilink、Vault一覧を含む）
 	 */
-	private async buildSystemPrompt(userText: string, providerId?: string): Promise<string> {
+	private async buildSystemPrompt(userText: string, provider?: LLMProvider): Promise<string> {
 		const parts: string[] = [];
 
 		// 1. ユーザーのカスタムシステムプロンプト
@@ -496,7 +495,7 @@ export class ChatView extends ItemView {
 		}
 
 		// 2. ファイル読み込み・編集機能の指示（プロバイダーで分岐）
-		if (providerId === "anthropic") {
+		if (provider?.supportsToolUse) {
 			parts.push(t("context.toolUseInstruction"));
 		} else {
 			parts.push(t("context.vaultReadInstruction"));
@@ -686,26 +685,18 @@ export class ChatView extends ItemView {
 				return { text: assistantMsg.content, writeProposals };
 			}
 
-			// --- Tool Use の処理 ---
+			// --- Tool Use の処理（プロバイダー非依存） ---
 			messageComponent.updateContent(t("chat.readingFiles"));
 
-			// アシスタントメッセージを rawContent 付きで追加
-			const assistantRawContent: unknown[] = [];
-			if (response.content) {
-				assistantRawContent.push({ type: "text", text: response.content });
+			// アシスタントメッセージを会話履歴に追加（プロバイダー固有形式）
+			if (provider.buildAssistantToolUseMessage) {
+				currentMessages.push(
+					provider.buildAssistantToolUseMessage(response.content || "", response.toolUses)
+				);
 			}
-			for (const tu of response.toolUses) {
-				assistantRawContent.push({
-					type: "tool_use", id: tu.id, name: tu.name, input: tu.input,
-				});
-			}
-			currentMessages.push({
-				role: "assistant", content: response.content || "",
-				rawContent: assistantRawContent,
-			});
 
 			// 各ツールを実行
-			const toolResults: unknown[] = [];
+			const toolResults: ToolResult[] = [];
 			for (const toolUse of response.toolUses) {
 				if (toolUse.name === "vault_read") {
 					// 自動実行: ファイル読み取り
@@ -713,14 +704,12 @@ export class ChatView extends ItemView {
 					const file = this.plugin.vaultReader.getFileByPath(filePath);
 					if (file) {
 						const content = await this.plugin.vaultReader.cachedReadFile(file);
-						toolResults.push({
-							type: "tool_result", tool_use_id: toolUse.id, content,
-						});
+						toolResults.push({ toolUseId: toolUse.id, name: toolUse.name, content });
 					} else {
 						toolResults.push({
-							type: "tool_result", tool_use_id: toolUse.id,
+							toolUseId: toolUse.id, name: toolUse.name,
 							content: `Error: File not found at "${filePath}"`,
-							is_error: true,
+							isError: true,
 						});
 					}
 				} else if (toolUse.name === "vault_write") {
@@ -730,16 +719,16 @@ export class ChatView extends ItemView {
 						content: toolUse.input.content as string,
 					});
 					toolResults.push({
-						type: "tool_result", tool_use_id: toolUse.id,
+						toolUseId: toolUse.id, name: toolUse.name,
 						content: "Edit proposal displayed to user for review.",
 					});
 				}
 			}
 
-			// tool_result メッセージを追加
-			currentMessages.push({
-				role: "user", content: "", rawContent: toolResults,
-			});
+			// ツール実行結果をメッセージとして追加（プロバイダー固有形式）
+			if (provider.buildToolResultMessages) {
+				currentMessages.push(...provider.buildToolResultMessages(toolResults));
+			}
 		}
 
 		return { text: assistantMsg.content, writeProposals };

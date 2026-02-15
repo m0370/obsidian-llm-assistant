@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo } from "./LLMProvider";
+import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo, Message, ToolUseBlock, ToolResult } from "./LLMProvider";
 
 /**
  * Anthropic (Claude) プロバイダー
@@ -13,7 +13,9 @@ export class AnthropicProvider implements LLMProvider {
 	name = "Anthropic";
 	requiresApiKey = true;
 	supportsCORS = false; // CORSヘッダー非対応 → 常にrequestUrl()
+	supportsToolUse = true;
 	apiEndpoint = "https://api.anthropic.com/v1/messages";
+	apiKeyUrl = "https://console.anthropic.com/settings/keys";
 
 	models: ModelInfo[] = [
 		{ id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 200000 },
@@ -67,6 +69,25 @@ export class AnthropicProvider implements LLMProvider {
 			"anthropic-version": "2023-06-01",
 			"anthropic-dangerous-direct-browser-access": "true",
 		};
+	}
+
+	buildAssistantToolUseMessage(content: string, toolUses: ToolUseBlock[]): Message {
+		const rawContent: unknown[] = [];
+		if (content) rawContent.push({ type: "text", text: content });
+		for (const tu of toolUses) {
+			rawContent.push({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input });
+		}
+		return { role: "assistant", content: content || "", rawContent };
+	}
+
+	buildToolResultMessages(results: ToolResult[]): Message[] {
+		const rawContent = results.map(r => ({
+			type: "tool_result",
+			tool_use_id: r.toolUseId,
+			content: r.content,
+			...(r.isError ? { is_error: true } : {}),
+		}));
+		return [{ role: "user", content: "", rawContent }];
 	}
 
 	async *chat(params: ChatRequest, apiKey: string): AsyncGenerator<string, ChatResponse, unknown> {
