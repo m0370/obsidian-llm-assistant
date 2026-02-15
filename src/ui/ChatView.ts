@@ -9,6 +9,7 @@ import { ConversationListModal } from "./ConversationListModal";
 import { FilePickerModal } from "./FilePickerModal";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage, type MessageData } from "./ChatMessage";
+import { setupMobileViewportHandler } from "./responsive";
 import { t } from "../i18n";
 
 /** Anthropic Tool Use API 用のツール定義 */
@@ -60,6 +61,7 @@ export class ChatView extends ItemView {
 	private currentConversationId: string | null = null;
 	private messages: MessageData[] = [];
 	private isGenerating = false;
+	private viewportCleanup: { destroy: () => void } | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -120,9 +122,14 @@ export class ChatView extends ItemView {
 		this.chatInput = new ChatInput(inputContainer, (text: string) => {
 			this.handleSend(text);
 		});
+
+		// Visual Viewport API によるキーボード対応（モバイル）
+		this.viewportCleanup = setupMobileViewportHandler(container);
 	}
 
 	async onClose(): Promise<void> {
+		this.viewportCleanup?.destroy();
+		this.viewportCleanup = null;
 		this.chatInput?.destroy();
 		this.contentEl.empty();
 	}
