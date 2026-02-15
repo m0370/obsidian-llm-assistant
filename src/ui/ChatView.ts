@@ -2,7 +2,7 @@ import { ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon } from
 import { VIEW_TYPE_CHAT, DISPLAY_NAME } from "../constants";
 import type LLMAssistantPlugin from "../main";
 import type { LLMProvider, Message, ToolDefinition, ToolResult } from "../llm/LLMProvider";
-import { sendRequest } from "../llm/streaming";
+import { sendRequest, RateLimitError } from "../llm/streaming";
 import { NoteContext } from "../vault/NoteContext";
 import { ConversationManager, type Conversation } from "./ConversationManager";
 import { ConversationListModal } from "./ConversationListModal";
@@ -467,9 +467,15 @@ export class ChatView extends ItemView {
 				await this.renderEditProposal(contentEl, op);
 			}
 		} catch (err) {
-			const errorMsg = err instanceof Error ? err.message : String(err);
-			assistantMsg.content = t("error.occurred", { message: errorMsg });
-			messageComponent.updateContent(assistantMsg.content);
+			let errorContent: string;
+			if (err instanceof RateLimitError) {
+				errorContent = this.buildRateLimitMessage(err.providerId);
+			} else {
+				const errorMsg = err instanceof Error ? err.message : String(err);
+				errorContent = t("error.occurred", { message: errorMsg });
+			}
+			assistantMsg.content = errorContent;
+			messageComponent.updateContent(errorContent);
 			messageComponent.getMessageEl().addClass("llm-message-error");
 		} finally {
 			generatingEl.remove();
@@ -1145,6 +1151,28 @@ export class ChatView extends ItemView {
 		dots.createEl("span");
 		this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
 		return el;
+	}
+
+	/**
+	 * レート制限エラー時のユーザーフレンドリーなメッセージを構築
+	 */
+	private buildRateLimitMessage(providerId: string): string {
+		const billingUrls: Record<string, string> = {
+			gemini: "https://aistudio.google.com/",
+			openai: "https://platform.openai.com/settings/organization/billing",
+			anthropic: "https://console.anthropic.com/settings/plans",
+			openrouter: "https://openrouter.ai/settings/credits",
+		};
+		const provider = this.plugin.providerRegistry.get(providerId);
+		const providerName = provider?.name || providerId;
+		const url = billingUrls[providerId];
+
+		let msg = `**${t("error.rateLimitTitle")}**\n\n`;
+		msg += t("error.rateLimitBody", { provider: providerName });
+		if (url) {
+			msg += `\n\n${t("error.rateLimitUpgrade", { url })}`;
+		}
+		return msg;
 	}
 
 	private showError(message: string): void {
