@@ -6,6 +6,7 @@ export class ChatInput {
 	private onSend: (text: string) => void;
 	private isComposing = false;
 	private viewportHandler: (() => void) | null = null;
+	private orientationHandler: (() => void) | null = null;
 
 	constructor(containerEl: HTMLElement, onSend: (text: string) => void) {
 		this.containerEl = containerEl;
@@ -22,7 +23,7 @@ export class ChatInput {
 			cls: "llm-input-textarea",
 			attr: {
 				placeholder: t("input.placeholder"),
-				rows: "2",
+				rows: "1",
 			},
 		});
 
@@ -47,47 +48,91 @@ export class ChatInput {
 			}
 		});
 
-		// フォーカス時にスクロールで入力欄を可視化（iOSキーボード対応）
+		// フォーカス時: visualViewport対応環境ではviewportHandlerに委譲
+		// 非対応環境のみフォールバック
 		this.textareaEl.addEventListener("focus", () => {
-			setTimeout(() => {
-				this.textareaEl.scrollIntoView({ block: "end", behavior: "smooth" });
-			}, 300);
+			if (!window.visualViewport) {
+				setTimeout(() => {
+					this.scrollChatToBottom();
+				}, 300);
+			}
 		});
 	}
 
 	/**
-	 * visualViewport APIでiOSキーボード表示時のレイアウト調整
-	 * getBoundingClientRect()で実際のオーバーフロー量を計算
+	 * iOSキーボード表示時のレイアウト調整（根本修正版）
+	 *
+	 * 方針:
+	 * - initialHeight記録方式でキーボード高さを正確に算出
+	 * - scrollIntoViewを廃止（iOS Safariでページ全体スクロールと競合するため）
+	 * - chatOutput.scrollTopで確実にスクロール
+	 * - resizeイベントのみ使用（scroll不要）
 	 */
 	private setupKeyboardHandler(): void {
 		if (!window.visualViewport) return;
 		const vv = window.visualViewport;
 
+		let initialHeight = vv.height;
+		let isKeyboardOpen = false;
+
 		this.viewportHandler = () => {
 			const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
 			if (!chatView) return;
 
-			const viewRect = chatView.getBoundingClientRect();
-			const visibleBottom = vv.offsetTop + vv.height;
-			const overflow = viewRect.bottom - visibleBottom;
+			// キーボード高さ = 初期ビューポート高さ - 現在のビューポート高さ
+			const keyboardHeight = initialHeight - vv.height;
+			const threshold = 100; // 100px以上の変化でキーボードと判定
 
-			if (overflow > 50) {
-				const newHeight = viewRect.height - overflow;
+			if (keyboardHeight > threshold) {
+				if (!isKeyboardOpen) {
+					isKeyboardOpen = true;
+					chatView.classList.add("keyboard-open");
+				}
+
+				// chatViewの高さをビューポートに合わせる
+				const newHeight = vv.height;
 				chatView.style.height = `${newHeight}px`;
 				chatView.style.maxHeight = `${newHeight}px`;
-				chatView.classList.add("keyboard-open");
+
+				// チャット出力エリアの末尾にスクロール
 				requestAnimationFrame(() => {
-					this.textareaEl.scrollIntoView({ block: "end", behavior: "smooth" });
+					this.scrollChatToBottom();
 				});
 			} else {
-				chatView.style.height = "";
-				chatView.style.maxHeight = "";
-				chatView.classList.remove("keyboard-open");
+				if (isKeyboardOpen) {
+					isKeyboardOpen = false;
+					chatView.style.height = "";
+					chatView.style.maxHeight = "";
+					chatView.classList.remove("keyboard-open");
+				}
 			}
 		};
 
+		// resizeのみでキーボード検出（scrollは不要、二重処理を防止）
 		vv.addEventListener("resize", this.viewportHandler);
-		vv.addEventListener("scroll", this.viewportHandler);
+
+		// 画面回転時にinitialHeightをリセット
+		this.orientationHandler = () => {
+			setTimeout(() => {
+				if (!isKeyboardOpen) {
+					initialHeight = vv.height;
+				}
+			}, 500);
+		};
+		window.addEventListener("orientationchange", this.orientationHandler);
+	}
+
+	/**
+	 * チャット出力エリアの末尾にスクロール
+	 * scrollIntoViewの代替（iOS Safariとの競合回避）
+	 */
+	private scrollChatToBottom(): void {
+		const chatOutput = this.containerEl.closest(
+			".llm-assistant-view"
+		)?.querySelector(".llm-chat-output") as HTMLElement;
+		if (chatOutput) {
+			chatOutput.scrollTop = chatOutput.scrollHeight;
+		}
 	}
 
 	private autoExpand(): void {
@@ -136,8 +181,11 @@ export class ChatInput {
 	destroy(): void {
 		if (this.viewportHandler && window.visualViewport) {
 			window.visualViewport.removeEventListener("resize", this.viewportHandler);
-			window.visualViewport.removeEventListener("scroll", this.viewportHandler);
 			this.viewportHandler = null;
+		}
+		if (this.orientationHandler) {
+			window.removeEventListener("orientationchange", this.orientationHandler);
+			this.orientationHandler = null;
 		}
 		// キーボードで変更した高さをリセット
 		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
