@@ -142,26 +142,33 @@ export class GeminiProvider implements LLMProvider {
 		const response = await requestUrl({ url, method: "GET", throw: false });
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
-		const models = response.json.models as Array<Record<string, unknown>>;
-		return models
+		// 取得したい代表シリーズ（優先度順）
+		const wantedPrefixes = [
+			"gemini-3-pro",
+			"gemini-3-flash",
+			"gemini-2.5-pro",
+			"gemini-2.5-flash",
+		];
+
+		const allModels = (response.json.models as Array<Record<string, unknown>>)
 			.filter(m => {
 				const methods = m.supportedGenerationMethods as string[] | undefined;
-				if (!methods?.includes("generateContent")) return false;
-				const id = ((m.name as string) || "").replace("models/", "");
-				// gemini-で始まるもののみ
-				if (!id.startsWith("gemini-")) return false;
-				// 実験版・embedding・旧世代を除外
-				if (id.includes("-exp-")) return false;
-				if (id.includes("embedding")) return false;
-				if (id.startsWith("gemini-1.0")) return false;
-				if (id.startsWith("gemini-pro")) return false;  // 旧gemini-pro
-				return true;
+				return methods?.includes("generateContent");
 			})
 			.map(m => ({
 				id: ((m.name as string) || "").replace("models/", ""),
 				name: (m.displayName as string) || (m.name as string) || "",
 				contextWindow: (m.inputTokenLimit as number) || 32000,
-			}))
-			.sort((a, b) => b.id.localeCompare(a.id));
+			}));
+
+		// 各シリーズから代表1モデルだけを選出
+		const picked: ModelInfo[] = [];
+		for (const prefix of wantedPrefixes) {
+			const match = allModels.find(m =>
+				m.id.startsWith(prefix) && !m.id.includes("-exp") && !m.id.includes("-lite")
+			);
+			if (match) picked.push(match);
+		}
+		return picked;
 	}
 }
