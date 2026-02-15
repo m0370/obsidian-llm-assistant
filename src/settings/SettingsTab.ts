@@ -136,6 +136,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			const setting = new Setting(containerEl)
 				.setName(`${provider.name} API Key`)
 				.setDesc(desc);
+			setting.settingEl.addClass("llm-apikey-setting");
 
 			setting.addText((text) => {
 				text.inputEl.type = "password";

@@ -956,3 +956,54 @@
 	opacity: 0.5;
 	cursor: default;
 }
+
+/* --- 設定画面: APIキー入力欄のレスポンシブ対応 --- */
+
+/* タブレット・モバイルでAPIキー設定を縦積みに */
+.llm-apikey-setting.setting-item {
+	flex-wrap: wrap;
+}
+
+.llm-apikey-setting .setting-item-info {
+	flex-basis: 100%;
+	max-width: 100%;
+}
+
+.llm-apikey-setting .setting-item-control {
+	flex-basis: 100%;
+	max-width: 100%;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding-top: 8px;
+}
+
+.llm-apikey-setting .setting-item-control input[type="password"],
+.llm-apikey-setting .setting-item-control input[type="text"] {
+	flex: 1 1 100%;
+	min-width: 0;
+}
+
+/* デスクトップ（十分な幅がある場合）は従来の横並びに復帰 */
+@media (min-width: 900px) {
+	.llm-apikey-setting.setting-item {
+		flex-wrap: nowrap;
+	}
+
+	.llm-apikey-setting .setting-item-info {
+		flex-basis: auto;
+		max-width: none;
+	}
+
+	.llm-apikey-setting .setting-item-control {
+		flex-basis: auto;
+		max-width: none;
+		flex-wrap: nowrap;
+		padding-top: 0;
+	}
+
+	.llm-apikey-setting .setting-item-control input[type="password"],
+	.llm-apikey-setting .setting-item-control input[type="text"] {
+		flex: 1 1 auto;
+		min-width: 200px;
+	}
+}
