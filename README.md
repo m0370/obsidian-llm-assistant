@@ -1,6 +1,6 @@
 # LLM Assistant for Obsidian
 
-Chat with multiple LLMs (Claude, GPT, Gemini) directly in Obsidian. Mobile-first design with secure API key management.
+Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design with secure API key management.
 
 **Works on all platforms** — iPhone / iPad / Mac / Windows / Android.
 
