@@ -7,14 +7,13 @@ export class ChatInput {
 	private sendBtn: HTMLButtonElement;
 	private onSend: (text: string) => void;
 	private isComposing = false;
-	private viewportHandler: (() => void) | null = null;
-	private orientationHandler: (() => void) | null = null;
+	private keyboardPollTimer: ReturnType<typeof setInterval> | null = null;
+	private isKeyboardOpen = false;
 
 	constructor(containerEl: HTMLElement, onSend: (text: string) => void) {
 		this.containerEl = containerEl;
 		this.onSend = onSend;
 		this.build();
-		this.setupKeyboardHandler();
 	}
 
 	private build(): void {
@@ -39,12 +38,12 @@ export class ChatInput {
 			this.send();
 		});
 
-		// auto-expand: 入力に応じて高さを自動調整
+		// auto-expand
 		this.textareaEl.addEventListener("input", () => {
 			this.autoExpand();
 		});
 
-		// IME変換中かどうかを追跡（日本語・中国語・韓国語等の入力対応）
+		// IME
 		this.textareaEl.addEventListener("compositionstart", () => {
 			this.isComposing = true;
 		});
@@ -52,7 +51,7 @@ export class ChatInput {
 			this.isComposing = false;
 		});
 
-		// Enter送信 (Shift+Enterで改行、IME変換中は送信しない)
+		// Enter送信
 		this.textareaEl.addEventListener("keydown", (e: KeyboardEvent) => {
 			if (e.key === "Enter" && !e.shiftKey && !this.isComposing && !e.isComposing) {
 				e.preventDefault();
@@ -60,84 +59,106 @@ export class ChatInput {
 			}
 		});
 
-		// フォーカス時: visualViewport対応環境ではviewportHandlerに委譲
-		// 非対応環境のみフォールバック
+		// --- iOSキーボード対応: focus/blurベースのポーリング ---
 		this.textareaEl.addEventListener("focus", () => {
-			if (!window.visualViewport) {
-				setTimeout(() => {
-					this.scrollChatToBottom();
-				}, 300);
-			}
+			this.startKeyboardPolling();
+		});
+
+		this.textareaEl.addEventListener("blur", () => {
+			this.stopKeyboardPolling();
+			// 少し待ってからリストア（他の要素へのフォーカス移動を考慮）
+			setTimeout(() => {
+				if (document.activeElement !== this.textareaEl) {
+					this.restoreLayout();
+				}
+			}, 200);
 		});
 	}
 
 	/**
-	 * iOSキーボード表示時のレイアウト調整
+	 * iOSキーボード対応: フォーカス中にポーリングで入力欄の可視性を監視
 	 *
-	 * 方針:
-	 * - window.innerHeight との差分でキーボード高さを算出（innerHeightはキーボードで変わらない）
-	 * - scrollIntoViewを廃止（iOS Safariでページ全体スクロールと競合するため）
-	 * - chatOutput.scrollTopで確実にスクロール
-	 * - resizeイベントのみ使用
-	 * - 高さ設定後にforce reflowで確実に反映
+	 * なぜポーリング方式か:
+	 * - Obsidian MobileのWKWebView内ではvisualViewport resizeイベントが
+	 *   信頼性が低く、発火しない/タイミングがずれるケースが多い
+	 * - getBoundingClientRectで直接「入力欄がキーボードに隠れているか」を検出
+	 * - 100msポーリングで確実にキーボード出現を捕捉
 	 */
-	private setupKeyboardHandler(): void {
-		if (!window.visualViewport) return;
-		const vv = window.visualViewport;
+	private startKeyboardPolling(): void {
+		if (this.keyboardPollTimer) return;
 
-		let isKeyboardOpen = false;
+		this.keyboardPollTimer = setInterval(() => {
+			this.adjustForKeyboard();
+		}, 100);
 
-		this.viewportHandler = () => {
-			const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
-			if (!chatView) return;
+		// 初回は少し待ってから（キーボードアニメーション完了を待つ）
+		setTimeout(() => this.adjustForKeyboard(), 300);
+	}
 
-			// キーボード高さ = layoutViewport高さ - visualViewport高さ
-			// window.innerHeight はキーボードに影響されない（iOS WKWebView）
-			const keyboardHeight = window.innerHeight - vv.height;
-			const threshold = 100;
-
-			if (keyboardHeight > threshold) {
-				if (!isKeyboardOpen) {
-					isKeyboardOpen = true;
-					chatView.classList.add("keyboard-open");
-				}
-
-				// chatViewの高さをvisualViewportに合わせる
-				chatView.style.setProperty("height", `${vv.height}px`, "important");
-				chatView.style.setProperty("max-height", `${vv.height}px`, "important");
-
-				// force reflow
-				void chatView.offsetHeight;
-
-				// チャット出力エリアの末尾にスクロール
-				requestAnimationFrame(() => {
-					this.scrollChatToBottom();
-				});
-			} else {
-				if (isKeyboardOpen) {
-					isKeyboardOpen = false;
-					chatView.style.removeProperty("height");
-					chatView.style.removeProperty("max-height");
-					chatView.classList.remove("keyboard-open");
-				}
-			}
-		};
-
-		vv.addEventListener("resize", this.viewportHandler);
-
-		// 画面回転対応
-		this.orientationHandler = () => {
-			setTimeout(() => {
-				if (this.viewportHandler) this.viewportHandler();
-			}, 500);
-		};
-		window.addEventListener("orientationchange", this.orientationHandler);
+	private stopKeyboardPolling(): void {
+		if (this.keyboardPollTimer) {
+			clearInterval(this.keyboardPollTimer);
+			this.keyboardPollTimer = null;
+		}
 	}
 
 	/**
-	 * チャット出力エリアの末尾にスクロール
-	 * scrollIntoViewの代替（iOS Safariとの競合回避）
+	 * 入力欄がvisualViewportの外にあるかを直接測定し、
+	 * chatViewの高さを縮めてキーボード上に入力欄を出す
 	 */
+	private adjustForKeyboard(): void {
+		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
+		if (!chatView) return;
+
+		const vv = window.visualViewport;
+		if (!vv) return;
+
+		// visualViewportの可視領域の下端
+		const visibleBottom = vv.offsetTop + vv.height;
+		// chatViewの現在のbounding rect
+		const chatViewRect = chatView.getBoundingClientRect();
+
+		// chatViewの下端がvisualViewportの下端より下にあるか
+		const overflow = chatViewRect.bottom - visibleBottom;
+
+		if (overflow > 30) {
+			// 入力欄がキーボードに隠れている
+			// chatViewの高さを可視領域に収まるように縮小
+			const newHeight = chatViewRect.height - overflow;
+
+			if (newHeight > 150) { // 最低150px確保
+				chatView.style.setProperty("height", `${newHeight}px`, "important");
+				chatView.style.setProperty("max-height", `${newHeight}px`, "important");
+
+				if (!this.isKeyboardOpen) {
+					this.isKeyboardOpen = true;
+					chatView.classList.add("keyboard-open");
+				}
+
+				// チャットを末尾にスクロール
+				requestAnimationFrame(() => {
+					this.scrollChatToBottom();
+				});
+			}
+		} else if (this.isKeyboardOpen && overflow < -50) {
+			// キーボードが閉じた（chatViewが可視領域より大幅に上にある）
+			this.restoreLayout();
+		}
+	}
+
+	/**
+	 * キーボードが閉じた後のレイアウト復元
+	 */
+	private restoreLayout(): void {
+		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
+		if (!chatView) return;
+
+		chatView.style.removeProperty("height");
+		chatView.style.removeProperty("max-height");
+		chatView.classList.remove("keyboard-open");
+		this.isKeyboardOpen = false;
+	}
+
 	private scrollChatToBottom(): void {
 		const chatOutput = this.containerEl.closest(
 			".llm-assistant-view"
@@ -166,9 +187,6 @@ export class ChatInput {
 		this.textareaEl.focus();
 	}
 
-	/**
-	 * 外部から送信をトリガー
-	 */
 	triggerSend(): void {
 		this.send();
 	}
@@ -199,19 +217,7 @@ export class ChatInput {
 	}
 
 	destroy(): void {
-		if (this.viewportHandler && window.visualViewport) {
-			window.visualViewport.removeEventListener("resize", this.viewportHandler);
-			this.viewportHandler = null;
-		}
-		if (this.orientationHandler) {
-			window.removeEventListener("orientationchange", this.orientationHandler);
-			this.orientationHandler = null;
-		}
-		const chatView = this.containerEl.closest(".llm-assistant-view") as HTMLElement;
-		if (chatView) {
-			chatView.style.removeProperty("height");
-			chatView.style.removeProperty("max-height");
-			chatView.classList.remove("keyboard-open");
-		}
+		this.stopKeyboardPolling();
+		this.restoreLayout();
 	}
 }
