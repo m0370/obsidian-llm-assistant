@@ -28,7 +28,7 @@ export class ChatInput {
 
 		// Sendボタン（テキストエリアと同じ行）
 		this.sendBtn = wrapper.createEl("button", {
-			cls: "llm-send-btn",
+			cls: "llm-send-btn clickable-icon",
 			attr: { "aria-label": t("input.send") },
 		});
 		setIcon(this.sendBtn, "send");

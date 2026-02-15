@@ -34,7 +34,7 @@ export class ChatMessage {
 		// ユーザーメッセージにのみ編集ボタンを追加
 		if (this.data.role === "user" && onEdit) {
 			const editBtn = headerEl.createEl("button", {
-				cls: "llm-message-edit-btn",
+				cls: "llm-message-edit-btn clickable-icon",
 				attr: { "aria-label": t("message.edit") },
 			});
 			setIcon(editBtn, "pencil");
