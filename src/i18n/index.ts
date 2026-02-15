@@ -193,6 +193,11 @@ const translations: Record<Locale, Record<string, string>> = {
 		"notice.modelsRefreshed": "Model list updated ({count} models)",
 		"notice.modelsRefreshFailed": "Failed to refresh models: {message}",
 		"notice.modelsRefreshNoKey": "API key required to refresh models",
+
+		// Rate limit (429)
+		"error.rateLimitTitle": "API rate limit reached",
+		"error.rateLimitBody": "You have exceeded the free tier usage limit for {provider}. Please wait a moment and try again, or upgrade to a paid API plan for higher limits.",
+		"error.rateLimitUpgrade": "Upgrade to paid plan: {url}",
 	},
 
 	ja: {
@@ -376,6 +381,11 @@ const translations: Record<Locale, Record<string, string>> = {
 		"notice.modelsRefreshed": "モデル一覧を更新しました（{count}件）",
 		"notice.modelsRefreshFailed": "モデル一覧の更新に失敗: {message}",
 		"notice.modelsRefreshNoKey": "モデル一覧の更新にはAPIキーが必要です",
+
+		// Rate limit (429)
+		"error.rateLimitTitle": "APIの利用制限に達しました",
+		"error.rateLimitBody": "{provider} の無料枠の利用上限を超えました。しばらく待ってから再試行するか、有料APIプランにアップグレードすると制限が大幅に緩和されます。",
+		"error.rateLimitUpgrade": "有料プランへのアップグレード: {url}",
 	},
 };
 

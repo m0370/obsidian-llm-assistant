@@ -3,6 +3,19 @@ import type { LLMProvider, ChatRequest, ChatResponse, ToolUseBlock } from "./LLM
 import type { GeminiProvider } from "./GeminiProvider";
 
 /**
+ * レート制限エラー（HTTP 429）
+ * プロバイダー情報を含み、UI側でアップグレード案内を表示するために使用
+ */
+export class RateLimitError extends Error {
+	providerId: string;
+	constructor(providerId: string, detail: string) {
+		super(detail);
+		this.name = "RateLimitError";
+		this.providerId = providerId;
+	}
+}
+
+/**
  * GeminiプロバイダーかどうかをチェックするType Guard
  */
 function isGeminiProvider(provider: LLMProvider): provider is GeminiProvider & LLMProvider {
@@ -79,6 +92,9 @@ async function streamWithFetch(
 
 	if (!response.ok) {
 		const errorText = await response.text();
+		if (response.status === 429) {
+			throw new RateLimitError(provider.id, errorText);
+		}
 		throw new Error(`API Error (${response.status}): ${errorText}`);
 	}
 
@@ -183,6 +199,9 @@ async function completeWithRequestUrl(
 	});
 
 	if (response.status !== 200) {
+		if (response.status === 429) {
+			throw new RateLimitError(provider.id, response.text);
+		}
 		throw new Error(`API Error (${response.status}): ${response.text}`);
 	}
 
