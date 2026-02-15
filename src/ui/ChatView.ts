@@ -123,9 +123,7 @@ export class ChatView extends ItemView {
 			this.handleSend(text);
 		});
 
-		// Visual Viewport API によるキーボード対応（モバイル）
-		// デバッグモード: 画面上部にviewport値を表示（問題解決後に削除）
-		container.dataset.llmDebug = "1";
+		// フォーカスベースのキーボード対応（モバイル）
 		this.viewportCleanup = setupMobileViewportHandler(container);
 	}
 
@@ -152,7 +150,7 @@ export class ChatView extends ItemView {
 		const headerActions = this.headerEl.createDiv({ cls: "llm-header-actions" });
 
 		const newChatBtn = headerActions.createEl("button", {
-			cls: "llm-header-btn",
+			cls: "llm-header-btn clickable-icon",
 			attr: { "aria-label": t("header.newChat") },
 		});
 		setIcon(newChatBtn, "plus");
@@ -164,7 +162,7 @@ export class ChatView extends ItemView {
 
 		// ⊕ 多機能メニューボタン
 		const menuBtn = headerActions.createEl("button", {
-			cls: "llm-header-btn",
+			cls: "llm-header-btn clickable-icon",
 			attr: { "aria-label": t("actionBar.more") },
 		});
 		setIcon(menuBtn, "plus-circle");
