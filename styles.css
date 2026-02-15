@@ -76,9 +76,13 @@
 	background: var(--background-modifier-active-hover);
 }
 
-.llm-header-btn svg {
+.llm-header-btn svg,
+.llm-header-btn .svg-icon {
 	width: 18px;
 	height: 18px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
 }
 
 /* --- チャット出力エリア --- */
@@ -198,9 +202,13 @@
 	padding: 0;
 }
 
-.llm-message-edit-btn svg {
+.llm-message-edit-btn svg,
+.llm-message-edit-btn .svg-icon {
 	width: 12px;
 	height: 12px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
 }
 
 .llm-message-edit-btn:hover {
@@ -365,9 +373,13 @@
 	cursor: not-allowed;
 }
 
-.llm-send-btn svg {
+.llm-send-btn svg,
+.llm-send-btn .svg-icon {
 	width: 16px;
 	height: 16px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
 }
 
 /* ============================================
@@ -394,7 +406,8 @@
 		height: 32px;
 	}
 
-	.llm-header-btn svg {
+	.llm-header-btn svg,
+	.llm-header-btn .svg-icon {
 		width: 16px;
 		height: 16px;
 	}
@@ -408,7 +421,8 @@
 		height: 32px;
 	}
 
-	.llm-send-btn svg {
+	.llm-send-btn svg,
+	.llm-send-btn .svg-icon {
 		width: 14px;
 		height: 14px;
 	}
@@ -824,9 +838,14 @@
 }
 
 .llm-edit-apply-btn svg,
-.llm-edit-dismiss-btn svg {
+.llm-edit-apply-btn .svg-icon,
+.llm-edit-dismiss-btn svg,
+.llm-edit-dismiss-btn .svg-icon {
 	width: 14px;
 	height: 14px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
 }
 
 .llm-edit-apply-btn {
@@ -920,9 +939,13 @@
 	min-height: 36px;
 }
 
-.llm-edit-undo-btn svg {
+.llm-edit-undo-btn svg,
+.llm-edit-undo-btn .svg-icon {
 	width: 14px;
 	height: 14px;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
 }
 
 .llm-edit-undo-btn:hover:not([disabled]) {
