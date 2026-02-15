@@ -285,7 +285,7 @@ export class ChatView extends ItemView {
 					const setting = (this.app as any).setting;
 					if (setting) {
 						setting.open();
-						setting.openTabById("obsidian-llm-assistant");
+						setting.openTabById("llm-assistant");
 					}
 				});
 		});

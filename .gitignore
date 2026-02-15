@@ -23,8 +23,7 @@ Thumbs.db
 .claude/
 .gemini/
 
-# GitHub Actions・デプロイスクリプト（未精査）
-.github/
+# デプロイスクリプト
 publish.sh
 
 # テストカバレッジ
