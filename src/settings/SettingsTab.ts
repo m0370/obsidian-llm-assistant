@@ -1,6 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type LLMAssistantPlugin from "../main";
-import { PROVIDERS, VIEW_TYPE_CHAT, getSystemPromptPresets } from "../constants";
+import { PROVIDERS, VIEW_TYPE_CHAT, DISPLAY_NAME, getSystemPromptPresets } from "../constants";
 import type { SecurityLevel } from "../security/SecretManager";
 import type { CustomEndpointProvider } from "../llm/CustomEndpointProvider";
 import { t, setLocale, resolveLocale } from "../i18n";
@@ -298,6 +298,18 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				});
 			});
+
+		// バージョン情報
+		const versionEl = containerEl.createEl("div", {
+			cls: "llm-settings-version",
+		});
+		versionEl.createEl("small", {
+			text: `${DISPLAY_NAME} v${this.plugin.manifest.version}`,
+		});
+		versionEl.style.textAlign = "center";
+		versionEl.style.color = "var(--text-muted)";
+		versionEl.style.marginTop = "2em";
+		versionEl.style.paddingBottom = "1em";
 	}
 
 	private applyCustomEndpoint(): void {
