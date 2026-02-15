@@ -259,6 +259,26 @@ function parseOpenAIResponse(json: Record<string, unknown>): ChatResponse {
 	const message = choices?.[0]?.message as Record<string, unknown>;
 	const usage = json.usage as Record<string, unknown> | undefined;
 
+	// Extract tool_calls (Function Calling)
+	const toolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined;
+	const toolUses: ToolUseBlock[] = [];
+	if (toolCalls) {
+		for (const tc of toolCalls) {
+			const fn = tc.function as Record<string, unknown>;
+			if (fn) {
+				try {
+					toolUses.push({
+						id: (tc.id as string) || "",
+						name: (fn.name as string) || "",
+						input: JSON.parse((fn.arguments as string) || "{}"),
+					});
+				} catch {
+					// JSON parse failure — skip this tool call
+				}
+			}
+		}
+	}
+
 	return {
 		content: (message?.content as string) || "",
 		model: (json.model as string) || "",
@@ -269,6 +289,7 @@ function parseOpenAIResponse(json: Record<string, unknown>): ChatResponse {
 			}
 			: undefined,
 		finishReason: (choices?.[0]?.finish_reason as string) || undefined,
+		toolUses: toolUses.length > 0 ? toolUses : undefined,
 	};
 }
 
@@ -313,8 +334,27 @@ function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
 	const parts = content?.parts as Array<Record<string, unknown>>;
 	const usageMeta = json.usageMetadata as Record<string, unknown> | undefined;
 
+	// Extract text and functionCall parts
+	let textContent = "";
+	const toolUses: ToolUseBlock[] = [];
+	if (parts) {
+		for (const part of parts) {
+			if (part.text) {
+				textContent += part.text as string;
+			}
+			if (part.functionCall) {
+				const fc = part.functionCall as Record<string, unknown>;
+				toolUses.push({
+					id: `gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+					name: (fc.name as string) || "",
+					input: (fc.args as Record<string, unknown>) || {},
+				});
+			}
+		}
+	}
+
 	return {
-		content: (parts?.[0]?.text as string) || "",
+		content: textContent,
 		model: (json.modelVersion as string) || "",
 		usage: usageMeta
 			? {
@@ -323,6 +363,7 @@ function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
 			}
 			: undefined,
 		finishReason: (candidates?.[0]?.finishReason as string) || undefined,
+		toolUses: toolUses.length > 0 ? toolUses : undefined,
 	};
 }
 

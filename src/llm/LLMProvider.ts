@@ -1,7 +1,7 @@
 export interface Message {
 	role: "user" | "assistant" | "system";
 	content: string;
-	rawContent?: unknown[];  // Anthropic Tool Use 用の構造化コンテンツ
+	rawContent?: unknown;  // Provider-opaque structured content for Tool Use
 }
 
 export interface ChatRequest {
@@ -45,6 +45,8 @@ export interface LLMProvider {
 	supportsCORS: boolean;
 	/** APIエンドポイント */
 	apiEndpoint: string;
+	/** API鍵取得用URL（設定画面のリンク用） */
+	apiKeyUrl?: string;
 
 	/**
 	 * ストリーミング対応チャット
@@ -72,9 +74,29 @@ export interface LLMProvider {
 	 * リクエストヘッダーを構築
 	 */
 	buildHeaders(apiKey: string): Record<string, string>;
+
+	/** Tool Use をサポートするか */
+	supportsToolUse?: boolean;
+
+	/** Tool Use 付きアシスタントメッセージを会話履歴用に構築 */
+	buildAssistantToolUseMessage?(content: string, toolUses: ToolUseBlock[]): Message;
+
+	/** ツール実行結果のメッセージ配列を構築 */
+	buildToolResultMessages?(results: ToolResult[]): Message[];
+
+	/** API からモデルリストを動的に取得 */
+	fetchModels?(apiKey: string): Promise<ModelInfo[]>;
 }
 
-/** Anthropic Tool Use API 用の型定義 */
+/** Tool Use 実行結果 */
+export interface ToolResult {
+	toolUseId: string;
+	name: string;
+	content: string;
+	isError?: boolean;
+}
+
+/** Tool Use API 用のツール定義（共通形式） */
 export interface ToolDefinition {
 	name: string;
 	description: string;

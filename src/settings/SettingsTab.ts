@@ -1,8 +1,9 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type LLMAssistantPlugin from "../main";
-import { PROVIDERS, VIEW_TYPE_CHAT, DISPLAY_NAME, getSystemPromptPresets } from "../constants";
+import { VIEW_TYPE_CHAT, DISPLAY_NAME, getSystemPromptPresets } from "../constants";
 import type { SecurityLevel } from "../security/SecretManager";
 import type { CustomEndpointProvider } from "../llm/CustomEndpointProvider";
+import type { LLMProvider } from "../llm/LLMProvider";
 import { t, setLocale, resolveLocale } from "../i18n";
 
 export class LLMAssistantSettingTab extends PluginSettingTab {
@@ -37,17 +38,18 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			});
 
 		// プロバイダー選択
+		const allProviders = this.plugin.providerRegistry.getAll();
 		new Setting(containerEl)
 			.setName(t("settings.provider"))
 			.setDesc(t("settings.providerDesc"))
 			.addDropdown((dropdown) => {
-				PROVIDERS.forEach((p) => {
+				allProviders.forEach((p) => {
 					dropdown.addOption(p.id, p.name);
 				});
 				dropdown.setValue(this.plugin.settings.activeProvider);
 				dropdown.onChange(async (value) => {
 					this.plugin.settings.activeProvider = value;
-					const provider = PROVIDERS.find((p) => p.id === value);
+					const provider = this.plugin.providerRegistry.get(value);
 					if (provider && provider.models.length > 0) {
 						this.plugin.settings.activeModel = provider.models[0].id;
 					}
@@ -57,11 +59,11 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			});
 
 		// モデル選択
-		const activeProvider = PROVIDERS.find(
-			(p) => p.id === this.plugin.settings.activeProvider
+		const activeProvider = this.plugin.providerRegistry.get(
+			this.plugin.settings.activeProvider
 		);
 		if (activeProvider) {
-			new Setting(containerEl)
+			const modelSetting = new Setting(containerEl)
 				.setName(t("settings.model"))
 				.setDesc(t("settings.modelDesc"))
 				.addDropdown((dropdown) => {
@@ -74,6 +76,16 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 				});
+
+			// モデルリスト更新ボタン（fetchModels対応プロバイダーのみ）
+			if (activeProvider.fetchModels) {
+				modelSetting.addButton((btn) => {
+					btn.setButtonText(t("settings.refreshModels"));
+					btn.onClick(async () => {
+						await this.refreshModels(activeProvider, btn);
+					});
+				});
+			}
 		}
 
 		// セキュリティレベル選択
@@ -117,7 +129,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		// API鍵設定セクション（SecretManager経由）
 		containerEl.createEl("h3", { text: t("settings.apiKeys") });
 
-		PROVIDERS.filter((p) => p.requiresApiKey).forEach((provider) => {
+		allProviders.filter((p) => p.requiresApiKey).forEach((provider) => {
 			const desc = provider.apiKeyUrl
 				? `${t("settings.apiKeyInput", { name: provider.name })}  |  ${t("settings.apiKeyUrl", { url: provider.apiKeyUrl })}`
 				: t("settings.apiKeyInput", { name: provider.name });
@@ -156,13 +168,11 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 						new Notice(t("settings.apiKeyNotSet"));
 						return;
 					}
-					const llmProvider = this.plugin.providerRegistry.get(provider.id);
-					if (!llmProvider) return;
 
 					btn.setButtonText(t("settings.apiKeyTesting"));
 					btn.setDisabled(true);
 					try {
-						const valid = await llmProvider.validateApiKey(apiKey);
+						const valid = await provider.validateApiKey(apiKey);
 						new Notice(valid ? t("notice.apiKeyValid") : t("notice.apiKeyInvalid"));
 					} catch (err) {
 						const detail = err instanceof Error ? err.message : String(err);
@@ -310,6 +320,36 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		versionEl.style.color = "var(--text-muted)";
 		versionEl.style.marginTop = "2em";
 		versionEl.style.paddingBottom = "1em";
+	}
+
+	private async refreshModels(provider: LLMProvider, btn: { setButtonText(text: string): void; setDisabled(disabled: boolean): void }): Promise<void> {
+		if (!provider.fetchModels) return;
+
+		// API鍵の取得（必要な場合）
+		let apiKey = "";
+		if (provider.requiresApiKey) {
+			const key = await this.plugin.secretManager.getApiKey(provider.id);
+			if (!key) {
+				new Notice(t("notice.modelsRefreshNoKey"));
+				return;
+			}
+			apiKey = key;
+		}
+
+		btn.setButtonText(t("settings.refreshingModels"));
+		btn.setDisabled(true);
+		try {
+			const models = await provider.fetchModels(apiKey);
+			provider.models = models;
+			new Notice(t("notice.modelsRefreshed", { count: models.length }));
+			this.display(); // UI再描画
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			new Notice(t("notice.modelsRefreshFailed", { message: msg }), 8000);
+		} finally {
+			btn.setButtonText(t("settings.refreshModels"));
+			btn.setDisabled(false);
+		}
 	}
 
 	private applyCustomEndpoint(): void {
