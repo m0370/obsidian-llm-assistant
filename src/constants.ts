@@ -27,6 +27,8 @@ export const DEFAULT_SETTINGS: LLMAssistantSettings = {
 	ragEmbeddingProvider: "openai",
 	ragEmbeddingModel: "text-embedding-3-small",
 	ragAutoIndex: false,
+	ragEmbeddingUseSharedKey: true,
+	ragEmbeddingCompactMode: false,
 };
 
 export interface LLMAssistantSettings {
@@ -48,11 +50,13 @@ export interface LLMAssistantSettings {
 	ragChunkStrategy: "section" | "paragraph" | "fixed";
 	ragChunkMaxTokens: number;
 	ragExcludeFolders: string;
-	// Phase 2用（デフォルト値のみ先に定義）
+	// Phase 2: Embedding検索
 	ragEmbeddingEnabled: boolean;
 	ragEmbeddingProvider: string;
 	ragEmbeddingModel: string;
 	ragAutoIndex: boolean;
+	ragEmbeddingUseSharedKey: boolean;
+	ragEmbeddingCompactMode: boolean;
 }
 
 export interface ProviderConfig {
