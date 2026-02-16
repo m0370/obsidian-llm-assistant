@@ -14,9 +14,9 @@ export class OpenAIProvider implements LLMProvider {
 		{ id: "gpt-5.2", name: "GPT-5.2", contextWindow: 400000 },
 		{ id: "gpt-5.1", name: "GPT-5.1", contextWindow: 400000 },
 		{ id: "gpt-5", name: "GPT-5", contextWindow: 400000 },
+		{ id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000 },
 		{ id: "gpt-4.1", name: "GPT-4.1", contextWindow: 1000000 },
 		{ id: "gpt-4.1-mini", name: "GPT-4.1 Mini", contextWindow: 1000000 },
-		{ id: "o4-mini", name: "o4-mini", contextWindow: 200000 },
 		{ id: "o3", name: "o3", contextWindow: 200000 },
 	];
 
