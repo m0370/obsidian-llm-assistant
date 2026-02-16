@@ -726,7 +726,11 @@ export class ChatView extends ItemView {
 			// アシスタントメッセージを会話履歴に追加（プロバイダー固有形式）
 			if (provider.buildAssistantToolUseMessage) {
 				currentMessages.push(
-					provider.buildAssistantToolUseMessage(response.content || "", response.toolUses)
+					provider.buildAssistantToolUseMessage(
+						response.content || "",
+						response.toolUses,
+						response.rawAssistantParts,
+					)
 				);
 			}
 

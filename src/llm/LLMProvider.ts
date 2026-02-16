@@ -23,6 +23,8 @@ export interface ChatResponse {
 	};
 	finishReason?: string;
 	toolUses?: ToolUseBlock[];
+	/** Raw response parts for providers that need exact reconstruction (e.g. Gemini thought_signature) */
+	rawAssistantParts?: unknown[];
 }
 
 export interface ModelInfo {
@@ -79,7 +81,7 @@ export interface LLMProvider {
 	supportsToolUse?: boolean;
 
 	/** Tool Use 付きアシスタントメッセージを会話履歴用に構築 */
-	buildAssistantToolUseMessage?(content: string, toolUses: ToolUseBlock[]): Message;
+	buildAssistantToolUseMessage?(content: string, toolUses: ToolUseBlock[], rawParts?: unknown[]): Message;
 
 	/** ツール実行結果のメッセージ配列を構築 */
 	buildToolResultMessages?(results: ToolResult[]): Message[];
@@ -111,4 +113,6 @@ export interface ToolUseBlock {
 	id: string;
 	name: string;
 	input: Record<string, unknown>;
+	/** Provider-specific raw data to preserve when reconstructing messages (e.g. Gemini thoughtSignature) */
+	rawPart?: unknown;
 }
