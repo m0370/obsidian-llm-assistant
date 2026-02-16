@@ -6,6 +6,7 @@ import type { CustomEndpointProvider } from "../llm/CustomEndpointProvider";
 import type { LLMProvider } from "../llm/LLMProvider";
 import { t, setLocale, resolveLocale } from "../i18n";
 import { estimateTokens } from "../utils/TokenCounter";
+import { isMobile } from "../utils/platform";
 
 export class LLMAssistantSettingTab extends PluginSettingTab {
 	plugin: LLMAssistantPlugin;
@@ -58,6 +59,12 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					this.display();
 				});
 			});
+
+		// Ollama + モバイル環境の警告
+		if (this.plugin.settings.activeProvider === "ollama" && isMobile()) {
+			const warningEl = containerEl.createDiv({ cls: "llm-embedding-privacy-note" });
+			warningEl.createEl("small", { text: t("settings.ollamaMobileWarning") });
+		}
 
 		// モデル選択
 		const activeProvider = this.plugin.providerRegistry.get(
