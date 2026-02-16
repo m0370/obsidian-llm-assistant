@@ -62,9 +62,20 @@ export default class LLMAssistantPlugin extends Plugin {
 		// 設定タブ
 		this.addSettingTab(new LLMAssistantSettingTab(this.app, this));
 
-		// RAGの初期化（有効時のみ動的インポート）
+		// RAGの初期化（有効時のみ動的インポート）+ 起動時自動インデックス構築
 		if (this.settings.ragEnabled) {
 			await this.initializeRAG();
+			// 起動後にバックグラウンドでインデックス自動構築（UIをブロックしない）
+			if (this.ragManager) {
+				setTimeout(async () => {
+					if (!this.ragManager || this.ragManager.isBuilt()) return;
+					await this.ragManager.buildIndex((current, total) => {
+						if (current === total) {
+							new Notice(t("notice.ragIndexComplete", { files: total, chunks: this.ragManager?.getStats().totalChunks ?? 0 }));
+						}
+					});
+				}, 2000); // 起動2秒後に開始
+			}
 		}
 
 		// RAGインデックス構築コマンド
