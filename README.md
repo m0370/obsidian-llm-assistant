@@ -1,6 +1,6 @@
 # LLM Assistant for Obsidian
 
-Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design with secure API key management.
+Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design with RAG-powered vault search and secure API key management.
 
 **Works on all platforms** — iPhone / iPad / Mac / Windows / Android.
 
@@ -12,12 +12,14 @@ Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design
 
 - **Chat UI** — Real-time streaming with Markdown rendering
 - **Multi-provider support** — Switch between 6 LLM providers from the header selector
+- **RAG (Vault Search)** — TF-IDF full-text search indexes your vault for context-aware conversations
+- **Embedding Search** — Semantic search using Embedding API (OpenAI / Gemini / Ollama) with hybrid ranking (RRF)
 - **Note context** — Attach vault notes as context for LLM conversations (with token count display)
 - **Vault file read/write** — LLM can read and propose edits to vault files via tool use or text tags
 - **Quick actions** — Summarize, translate, proofread, explain, or expand selected text from the editor context menu
 - **Conversation history** — Auto-save, browse, resume, and delete past conversations
 - **System prompt presets** — 6 built-in presets (polite Japanese assistant, technical writer, translator, etc.)
-- **Secure API key management** — SecretStorage API / WebCrypto encryption / plaintext (3 levels)
+- **Secure API key management** — SecretStorage API / WebCrypto encryption (2 levels)
 - **Responsive design** — Optimized for smartphone, tablet, and desktop
 
 ### Supported Providers
@@ -80,7 +82,45 @@ Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design
 2. Type your message in the text area at the bottom
 3. Press `Enter` or the send button to send (`Shift + Enter` for new line)
 4. The assistant's response streams in real-time with Markdown rendering
-5. Click "+" to start a new chat (current conversation is auto-saved)
+5. Click the pen icon to start a new chat (current conversation is auto-saved)
+
+#### RAG (Vault Search)
+
+RAG automatically indexes your vault and injects relevant notes as context when you chat.
+
+1. Enable **RAG** in Settings > Advanced Settings (RAG / Embedding)
+2. Click **Build Index** to create the search index
+3. The index is cached and only changed files are re-indexed on restart
+4. When you send a message, the plugin automatically searches your vault and includes relevant context in the prompt
+
+Settings:
+- **Top-K results**: Number of search results to include (1-20)
+- **Minimum score**: Relevance threshold (0.0-1.0)
+- **Chunk strategy**: Section / Paragraph / Fixed token size
+- **Max tokens per chunk**: 128-2048
+- **Exclude folders**: Comma-separated folder paths to exclude from indexing
+
+#### Embedding Search (Semantic Search)
+
+Embedding search adds semantic understanding on top of TF-IDF text search, enabling the LLM to find conceptually related notes even when different words are used.
+
+1. Enable **RAG** first, then enable **Embedding Search** in the same settings section
+2. Choose an **Embedding provider** (OpenAI / Google Gemini / Ollama)
+3. Click **Build Embedding Index** to generate vectors
+4. Search results now combine text matching and semantic similarity via Reciprocal Rank Fusion (RRF)
+
+Embedding providers:
+| Provider | Model | Dimensions | Cost |
+|:---|:---|:---:|:---|
+| OpenAI | text-embedding-3-small | 1536 | $0.02 / 1M tokens |
+| OpenAI | text-embedding-3-large | 3072 | $0.13 / 1M tokens |
+| Google Gemini | gemini-embedding-001 | 3072 | Free tier available (100 RPM) |
+| Ollama | nomic-embed-text | 1024 | Free (local) |
+
+Options:
+- **Compact mode**: Reduces dimensions by ~66% to save memory and storage (recommended for mobile and large vaults)
+- **Background auto-embedding**: Automatically generate embeddings during idle time
+- **Cost estimate**: Displayed before building the index
 
 #### Note Attachment
 
@@ -111,6 +151,14 @@ Select text in the editor and right-click (or long-press on mobile) to access:
 - Delete unwanted conversations with the x button
 - Conversations are auto-saved when you send a message
 
+#### Commands
+
+| Command | Description |
+|:---|:---|
+| Open Chat Panel | Open the chat interface |
+| Build RAG Index | Manually rebuild the full-text search index |
+| Build Embedding Index | Manually rebuild the embedding vector index |
+
 #### System Prompt Presets
 
 Select a preset from the dropdown in settings:
@@ -130,25 +178,33 @@ Select a preset from the dropdown in settings:
 |:---|:---|:---|
 | **LLM** | Provider | Select the LLM provider |
 | | Model | Select the model |
-| **Security** | API key storage | SecretStorage (recommended) / WebCrypto encryption / Plaintext |
+| **Security** | API key storage | SecretStorage (recommended) / WebCrypto encryption |
 | | Master password | Shown only for WebCrypto. Kept in memory for session only |
 | **API Keys** | Per-provider API keys | With test and delete buttons |
 | **Custom Endpoint** | Endpoint URL | URL of an OpenAI-compatible API |
 | | Model ID | Model identifier to use |
-| **Advanced** | Streaming mode | Real-time response display (on/off) |
+| **Display** | Font size | Small / Medium / Large |
+| | Streaming mode | Real-time response display (on/off) |
 | | Temperature | Generation creativity (0.0-1.0) |
 | | Preset | System prompt template selection |
 | | System prompt | Default instruction to LLM (free text) |
+| **RAG** | Enable RAG | Toggle vault search indexing |
+| | Top-K / Score threshold | Search result count and relevance filter |
+| | Chunk strategy / Max tokens | How vault files are split for indexing |
+| | Exclude folders | Folders to skip during indexing |
+| **Embedding** | Enable Embedding Search | Toggle semantic vector search |
+| | Embedding provider / model | Choose embedding API and model |
+| | Compact mode | Reduce dimensions for memory savings |
+| | Background auto-embedding | Auto-generate embeddings during idle |
 
 ### Security
 
-API key storage has 3 levels:
+API key storage has 2 levels:
 
 | Level | Method | Description |
 |:---|:---|:---|
 | **Recommended** | SecretStorage API | Uses OS-level secure storage (macOS Keychain, etc.). Requires Obsidian v1.11.4+ |
 | **Alternative** | WebCrypto encryption | PBKDF2 (100k iterations) + AES-256-GCM encryption. Requires master password (session-only) |
-| **Not recommended** | Plaintext | Stored unencrypted in plugin data. For development/testing only (warning displayed) |
 
 ### Migration from previous versions
 
@@ -189,7 +245,7 @@ npm run check-mobile
 
 ## Japanese Documentation
 
-Obsidian上でLLM（大規模言語モデル）を活用し、ノート執筆支援やVault内ファイルの理解を行うプラグインです。
+Obsidian上でLLM（大規模言語モデル）を活用し、ノート執筆支援やVault内ファイルの理解を行うプラグインです。RAGによるVault検索とEmbeddingセマンティック検索で、関連するノートを自動的にコンテキストとして活用できます。
 
 **モバイルファースト設計** — iPhone / iPad / Mac / Windows / Android の全プラットフォームで動作します。
 
@@ -205,6 +261,7 @@ LLM Assistantは以下の方針で設計されています:
 - 全プラットフォーム（iPhone/iPad/Mac/Windows/Android）での動作保証
 - 複数のLLMプロバイダーに対応（APIキーがあればすぐに使える）
 - API鍵の安全な保管（SecretStorage / WebCrypto暗号化）
+- RAG + Embeddingによるスマートなノート検索
 
 ---
 
@@ -212,12 +269,14 @@ LLM Assistantは以下の方針で設計されています:
 
 - **チャットUI** — ストリーミング対応のリアルタイム表示、Markdownレンダリング
 - **マルチプロバイダー対応** — 6種類のLLMプロバイダーをヘッダーのセレクタで切り替え
+- **RAG（Vault検索）** — TF-IDF全文検索でVaultをインデックス化し、関連ノートを自動的にコンテキストとして注入
+- **Embedding検索** — Embedding APIによるセマンティック検索。ハイブリッドランキング（RRF）でTF-IDFと統合
 - **ノート添付コンテキスト** — Vault内のノートをコンテキストとしてLLMに送信（トークンカウント表示付き）
 - **Vaultファイルの読み込み・編集** — LLMがTool UseまたはテキストタグでVaultファイルを読み取り、編集を提案
 - **クイックアクション** — エディタの右クリックメニューから選択テキストを要約・翻訳・校正・解説・展開
 - **会話履歴** — 会話の自動保存・一覧表示・再開・削除
 - **システムプロンプトプリセット** — 丁寧な日本語アシスタント、テクニカルライター、翻訳者など6種類
-- **セキュアなAPI鍵管理** — SecretStorage API / WebCrypto暗号化 / 平文の3段階から選択
+- **セキュアなAPI鍵管理** — SecretStorage API / WebCrypto暗号化の2段階から選択
 - **レスポンシブデザイン** — スマートフォン・タブレット・デスクトップそれぞれに最適化
 
 ---
@@ -318,7 +377,45 @@ LLM Assistantは以下の方針で設計されています:
 2. 画面下部のテキストエリアにメッセージを入力
 3. `Enter` キーまたは送信ボタンで送信（`Shift + Enter` で改行）
 4. アシスタントの応答がストリーミング表示されます（Markdown形式でレンダリング）
-5. 「+」ボタンで新規チャットを開始（現在の会話は自動保存されます）
+5. ペンアイコンで新規チャットを開始（現在の会話は自動保存されます）
+
+#### RAG（Vault検索）
+
+RAGを有効にすると、チャット時にVault内の関連ノートが自動的にコンテキストとして注入されます。
+
+1. 設定 > 詳細設定（RAG / Embedding）で**RAG**を有効化
+2. **インデックス構築**ボタンをクリック
+3. インデックスはキャッシュされ、次回起動時は変更されたファイルのみ再インデックスされます
+4. メッセージ送信時、プラグインが自動的にVaultを検索し、関連コンテキストをプロンプトに含めます
+
+設定項目:
+- **検索結果数**: コンテキストに含める件数（1-20）
+- **スコア閾値**: 関連性の最低スコア（0.0-1.0）
+- **チャンク分割戦略**: セクション / パラグラフ / 固定トークン数
+- **チャンク最大トークン数**: 128-2048
+- **除外フォルダ**: インデックスから除外するフォルダ（カンマ区切り）
+
+#### Embedding検索（セマンティック検索）
+
+Embedding検索は、TF-IDFテキスト検索に加えてセマンティックな理解を追加します。異なる言葉が使われていても、概念的に関連するノートを見つけることができます。
+
+1. まず**RAG**を有効化し、同じ設定セクション内で**Embedding検索**を有効化
+2. **Embeddingプロバイダー**を選択（OpenAI / Google Gemini / Ollama）
+3. **Embeddingインデックス構築**ボタンをクリックしてベクトルを生成
+4. 検索結果はテキストマッチングとセマンティック類似度をReciprocal Rank Fusion（RRF）で統合
+
+Embeddingプロバイダー:
+| プロバイダー | モデル | 次元数 | コスト |
+|:---|:---|:---:|:---|
+| OpenAI | text-embedding-3-small | 1536 | $0.02 / 100万トークン |
+| OpenAI | text-embedding-3-large | 3072 | $0.13 / 100万トークン |
+| Google Gemini | gemini-embedding-001 | 3072 | 無料枠あり（100リクエスト/分） |
+| Ollama | nomic-embed-text | 1024 | 無料（ローカル実行） |
+
+オプション:
+- **省メモリモード**: 次元数を約66%削減してメモリとストレージを節約（モバイルや大規模Vaultで推奨）
+- **バックグラウンド自動Embedding**: アイドル時にEmbeddingを自動生成
+- **コスト見積もり**: インデックス構築前に表示
 
 #### ノートの添付
 
@@ -351,6 +448,14 @@ Vault内のノートをコンテキストとしてLLMに送信できます。
 - xボタンで不要な会話を削除
 - 新しいメッセージを送信すると自動的に保存されます
 
+#### コマンド
+
+| コマンド | 説明 |
+|:---|:---|
+| チャットパネルを開く | チャットインターフェースを開く |
+| RAGインデックスを構築 | 全文検索インデックスを手動で再構築 |
+| Embeddingインデックスを構築 | Embeddingベクトルインデックスを手動で再構築 |
+
 #### システムプロンプトプリセット
 
 設定画面の「プリセット」ドロップダウンから、用途に応じたシステムプロンプトを選択できます:
@@ -374,27 +479,35 @@ Vault内のノートをコンテキストとしてLLMに送信できます。
 |:---|:---|:---|
 | **LLM** | プロバイダー | 使用するLLMプロバイダーを選択 |
 | | モデル | 使用するモデルを選択 |
-| **セキュリティ** | API鍵の保存方式 | SecretStorage（推奨）/ WebCrypto暗号化 / 平文 |
+| **セキュリティ** | API鍵の保存方式 | SecretStorage（推奨）/ WebCrypto暗号化 |
 | | マスターパスワード | WebCrypto選択時のみ表示。セッション中のみ保持 |
 | **APIキー** | 各プロバイダーのAPIキー | テスト・削除ボタン付き |
 | **カスタムエンドポイント** | エンドポイントURL | OpenAI互換APIのURL |
 | | モデルID | 使用するモデルの識別子 |
-| **詳細設定** | ストリーミングモード | レスポンスのリアルタイム表示（オン/オフ） |
+| **表示** | フォントサイズ | 小 / 中 / 大 |
+| | ストリーミングモード | レスポンスのリアルタイム表示（オン/オフ） |
 | | Temperature | 生成の創造性（0.0〜1.0） |
 | | プリセット | システムプロンプトのテンプレート選択 |
 | | システムプロンプト | LLMへのデフォルト指示（自由記述） |
+| **RAG** | RAGを有効化 | Vault検索のインデックスを有効化 |
+| | 検索結果数 / スコア閾値 | 検索件数と関連性フィルタ |
+| | チャンク戦略 / 最大トークン | ファイルの分割方法 |
+| | 除外フォルダ | インデックスから除外するフォルダ |
+| **Embedding** | Embedding検索を有効化 | セマンティックベクトル検索の有効化 |
+| | プロバイダー / モデル | Embedding APIとモデルの選択 |
+| | 省メモリモード | 次元数を削減してメモリを節約 |
+| | バックグラウンド自動Embedding | アイドル時にEmbeddingを自動生成 |
 
 ---
 
 ### セキュリティについて
 
-API鍵の保管方法は3段階から選択できます:
+API鍵の保管方法は2段階から選択できます:
 
 | レベル | 方式 | 説明 |
 |:---|:---|:---|
 | **推奨** | SecretStorage API | OSレベルのセキュアストレージ（macOS Keychain等）を利用。Obsidian v1.11.4以上で利用可能 |
 | **代替** | WebCrypto暗号化 | PBKDF2（10万回反復）+ AES-256-GCMで暗号化。マスターパスワードが必要（セッション中のみ保持） |
-| **非推奨** | 平文保存 | プラグインデータに暗号化なしで保存。開発・テスト用途向け（警告表示あり） |
 
 ---
 
