@@ -1,4 +1,4 @@
-import { Platform } from "obsidian";
+import { Platform, requestUrl } from "obsidian";
 import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo } from "./LLMProvider";
 
 /**
@@ -74,23 +74,38 @@ export class OllamaProvider implements LLMProvider {
 
 	async validateApiKey(_apiKey: string): Promise<boolean> {
 		// Ollamaの接続テスト（APIキー不要、サーバー到達確認）
+		// requestUrl()を使用（fetch()はObsidianのCSP制約で失敗する場合がある）
 		try {
-			const response = await fetch("http://localhost:11434/api/tags");
-			return response.ok;
+			const response = await requestUrl({
+				url: "http://localhost:11434/api/tags",
+				method: "GET",
+			});
+			return response.status === 200;
 		} catch {
 			return false;
 		}
 	}
 
 	async fetchModels(_apiKey: string): Promise<ModelInfo[]> {
-		const response = await fetch("http://localhost:11434/api/tags");
-		if (!response.ok) throw new Error(`HTTP ${response.status}`);
-		const data = await response.json();
-		const models = data.models as Array<Record<string, unknown>>;
-		return (models || []).map(m => ({
-			id: (m.name as string) || "",
-			name: (m.name as string) || "",
-			contextWindow: 128000,
-		}));
+		try {
+			const response = await requestUrl({
+				url: "http://localhost:11434/api/tags",
+				method: "GET",
+			});
+			if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+			const data = response.json;
+			const models = data.models as Array<Record<string, unknown>>;
+			return (models || []).map(m => ({
+				id: (m.name as string) || "",
+				name: (m.name as string) || "",
+				contextWindow: 128000,
+			}));
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			if (msg.includes("ERR_CONNECTION_REFUSED") || msg.includes("Failed to fetch")) {
+				throw new Error("Ollama サーバーに接続できません (localhost:11434)。Ollamaが起動しているか確認してください。");
+			}
+			throw err;
+		}
 	}
 }
