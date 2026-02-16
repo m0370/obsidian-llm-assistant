@@ -167,7 +167,7 @@ export class ChatView extends ItemView {
 			cls: "llm-header-btn clickable-icon",
 			attr: { "aria-label": t("header.newChat") },
 		});
-		setIcon(newChatBtn, "plus");
+		setIcon(newChatBtn, "refresh-cw");
 		newChatBtn.addEventListener("click", async () => {
 			try { await this.saveCurrentConversation(); } catch { /* ignore */ }
 			this.clearChat();

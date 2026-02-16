@@ -1017,6 +1017,38 @@
 	}
 }
 
+/* --- 高度な設定アコーディオン --- */
+
+.llm-settings-advanced-details {
+	margin-top: 1.5em;
+}
+
+.llm-settings-advanced-summary {
+	cursor: pointer;
+	padding: 8px 0;
+	font-weight: 600;
+	color: var(--text-muted);
+	user-select: none;
+	-webkit-user-select: none;
+	list-style: none;
+}
+
+.llm-settings-advanced-summary::-webkit-details-marker {
+	display: none;
+}
+
+.llm-settings-advanced-summary::before {
+	content: "\25B6";
+	display: inline-block;
+	margin-right: 8px;
+	font-size: 10px;
+	transition: transform 0.2s ease;
+}
+
+.llm-settings-advanced-details[open] > .llm-settings-advanced-summary::before {
+	transform: rotate(90deg);
+}
+
 /* --- RAG設定 --- */
 
 .llm-rag-note {
