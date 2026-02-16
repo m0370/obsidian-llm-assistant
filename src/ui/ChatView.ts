@@ -387,7 +387,7 @@ export class ChatView extends ItemView {
 
 		// API鍵を取得（SecretManager経由）
 		const apiKey = await this.getApiKey(provider);
-		if (!apiKey) {
+		if (provider.requiresApiKey && !apiKey) {
 			const apiKeyUrl = provider.apiKeyUrl;
 			if (apiKeyUrl) {
 				this.showError(t("error.apiKeyNotSetWithUrl", { name: provider.name, url: apiKeyUrl }));
@@ -396,6 +396,7 @@ export class ChatView extends ItemView {
 			}
 			return;
 		}
+		const finalApiKey = apiKey || "";
 
 		// 生成開始
 		this.isGenerating = true;
@@ -434,7 +435,7 @@ export class ChatView extends ItemView {
 			if (provider.supportsToolUse) {
 				// Tool Use API を使用（Anthropic, OpenAI, Gemini, OpenRouter）
 				const result = await this.callLLMWithToolUse(
-					provider, chatMessages, systemPrompt, apiKey,
+					provider, chatMessages, systemPrompt, finalApiKey,
 					assistantMsg, messageComponent,
 				);
 				finalContent = result.text;
@@ -442,7 +443,7 @@ export class ChatView extends ItemView {
 			} else {
 				// テキストタグ方式（Ollama, Custom等）
 				const rawContent = await this.callLLMWithFileReading(
-					provider, chatMessages, systemPrompt, apiKey,
+					provider, chatMessages, systemPrompt, finalApiKey,
 					assistantMsg, messageComponent,
 				);
 				writeOperations = this.parseVaultWriteTags(rawContent);
