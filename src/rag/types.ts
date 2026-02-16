@@ -30,4 +30,9 @@ export interface IndexStats {
 	indexedFiles: number;
 	lastUpdated: number;
 	storageSizeBytes: number;
+	// Phase 2: Embedding
+	embeddingIndexed: number;
+	embeddingModel?: string;
+	embeddingStorageBytes: number;
+	embeddingTotalTokensUsed: number;
 }

@@ -5,6 +5,7 @@ import type { SecurityLevel } from "../security/SecretManager";
 import type { CustomEndpointProvider } from "../llm/CustomEndpointProvider";
 import type { LLMProvider } from "../llm/LLMProvider";
 import { t, setLocale, resolveLocale } from "../i18n";
+import { estimateTokens } from "../utils/TokenCounter";
 
 export class LLMAssistantSettingTab extends PluginSettingTab {
 	plugin: LLMAssistantPlugin;
@@ -436,9 +437,229 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			}
 
-			// Phase 2 予告
-			const noteEl = containerEl.createDiv({ cls: "llm-rag-note" });
-			noteEl.createEl("small", { text: t("settings.ragEmbeddingNote") });
+			// --- Embedding検索セクション ---
+			containerEl.createEl("h4", { text: t("settings.ragEmbedding") });
+
+			new Setting(containerEl)
+				.setName(t("settings.ragEmbeddingEnabled"))
+				.setDesc(t("settings.ragEmbeddingEnabledDesc"))
+				.addToggle((toggle) => {
+					toggle.setValue(this.plugin.settings.ragEmbeddingEnabled);
+					toggle.onChange(async (value) => {
+						this.plugin.settings.ragEmbeddingEnabled = value;
+						await this.plugin.saveSettings();
+						if (value && this.plugin.ragManager) {
+							await this.plugin.ragManager.initializeEmbedding(
+								this.plugin.embeddingProviderRegistry,
+								this.plugin.settings.ragEmbeddingProvider,
+								this.plugin.settings.ragEmbeddingModel,
+								this.plugin.settings.ragEmbeddingCompactMode,
+							);
+						}
+						this.display();
+					});
+				});
+
+			if (this.plugin.settings.ragEmbeddingEnabled) {
+				// プライバシー警告
+				const privacyNote = containerEl.createDiv({ cls: "llm-embedding-privacy-note" });
+				privacyNote.createEl("small", { text: t("settings.ragEmbeddingEnabledDesc") });
+
+				// Embeddingプロバイダー選択
+				const embeddingProviders = this.plugin.embeddingProviderRegistry.getAll();
+				new Setting(containerEl)
+					.setName(t("settings.ragEmbeddingProvider"))
+					.setDesc(t("settings.ragEmbeddingProviderDesc"))
+					.addDropdown((dropdown) => {
+						for (const p of embeddingProviders) {
+							dropdown.addOption(p.id, p.name);
+						}
+						dropdown.setValue(this.plugin.settings.ragEmbeddingProvider);
+						dropdown.onChange(async (value) => {
+							this.plugin.settings.ragEmbeddingProvider = value;
+							const provider = this.plugin.embeddingProviderRegistry.get(value);
+							if (provider && provider.models.length > 0) {
+								this.plugin.settings.ragEmbeddingModel = provider.models[0].id;
+							}
+							await this.plugin.saveSettings();
+							this.display();
+						});
+					});
+
+				// プロバイダーTip
+				const selectedProviderId = this.plugin.settings.ragEmbeddingProvider;
+				if (selectedProviderId === "gemini") {
+					const tipEl = containerEl.createDiv({ cls: "llm-rag-note" });
+					tipEl.createEl("small", { text: t("settings.ragEmbeddingGeminiTip") });
+				} else if (selectedProviderId === "ollama") {
+					const tipEl = containerEl.createDiv({ cls: "llm-rag-note" });
+					tipEl.createEl("small", { text: t("settings.ragEmbeddingOllamaTip") });
+				}
+
+				// Embeddingモデル選択
+				const selectedProvider = this.plugin.embeddingProviderRegistry.get(selectedProviderId);
+				if (selectedProvider && selectedProvider.models.length > 0) {
+					new Setting(containerEl)
+						.setName(t("settings.ragEmbeddingModel"))
+						.addDropdown((dropdown) => {
+							for (const m of selectedProvider.models) {
+								dropdown.addOption(m.id, `${m.name} (${m.dimensions}d)`);
+							}
+							dropdown.setValue(this.plugin.settings.ragEmbeddingModel);
+							dropdown.onChange(async (value) => {
+								this.plugin.settings.ragEmbeddingModel = value;
+								await this.plugin.saveSettings();
+								this.display();
+							});
+						});
+				}
+
+				// APIキー設定（Ollama以外）
+				if (selectedProvider && selectedProvider.requiresApiKey) {
+					new Setting(containerEl)
+						.setName(t("settings.ragEmbeddingUseSharedKey"))
+						.setDesc(t("settings.ragEmbeddingUseSharedKeyDesc"))
+						.addToggle((toggle) => {
+							toggle.setValue(this.plugin.settings.ragEmbeddingUseSharedKey);
+							toggle.onChange(async (value) => {
+								this.plugin.settings.ragEmbeddingUseSharedKey = value;
+								await this.plugin.saveSettings();
+								this.display();
+							});
+						});
+
+					// 独立APIキー入力（共有キー無効時のみ）
+					if (!this.plugin.settings.ragEmbeddingUseSharedKey) {
+						const keyId = `embedding-${selectedProviderId}`;
+						const keySetting = new Setting(containerEl)
+							.setName(t("settings.ragEmbeddingApiKey"));
+						keySetting.addText((text) => {
+							text.inputEl.type = "password";
+							text.setPlaceholder(`${selectedProvider.name} API Key`);
+							this.plugin.secretManager.getApiKey(keyId).then((key) => {
+								if (key) text.setValue(key);
+							});
+							text.onChange(async (value) => {
+								if (value) {
+									try {
+										await this.plugin.secretManager.saveApiKey(keyId, value);
+									} catch (err) {
+										const msg = err instanceof Error ? err.message : String(err);
+										new Notice(t("notice.apiKeySaveFailed", { message: msg }));
+									}
+								}
+							});
+						});
+					}
+				}
+
+				// 省メモリモード
+				if (selectedProvider && selectedProviderId !== "ollama") {
+					const modelInfo = selectedProvider.models.find(
+						(m) => m.id === this.plugin.settings.ragEmbeddingModel,
+					);
+					if (modelInfo?.reducedDimensions) {
+						new Setting(containerEl)
+							.setName(t("settings.ragEmbeddingCompactMode"))
+							.setDesc(t("settings.ragEmbeddingCompactModeDesc"))
+							.addToggle((toggle) => {
+								toggle.setValue(this.plugin.settings.ragEmbeddingCompactMode);
+								toggle.onChange(async (value) => {
+									this.plugin.settings.ragEmbeddingCompactMode = value;
+									await this.plugin.saveSettings();
+								});
+							});
+					}
+				}
+
+				// コスト見積もり
+				if (selectedProvider) {
+					const modelInfo = selectedProvider.models.find(
+						(m) => m.id === this.plugin.settings.ragEmbeddingModel,
+					);
+					const stats = this.plugin.ragManager?.getStats();
+					const totalChunks = stats?.totalChunks ?? 0;
+					const avgTokens = Math.floor(this.plugin.settings.ragChunkMaxTokens / 2);
+					const costEl = containerEl.createDiv({ cls: "llm-embedding-cost" });
+
+					if (modelInfo?.costPer1MTokens === 0) {
+						costEl.createEl("small", { text: t("settings.ragEmbeddingCostFree") });
+					} else if (totalChunks > 0 && modelInfo?.costPer1MTokens) {
+						const cost = ((totalChunks * avgTokens) / 1_000_000) * modelInfo.costPer1MTokens;
+						costEl.createEl("small", {
+							text: t("settings.ragEmbeddingCostEstimate", {
+								chunks: totalChunks,
+								tokensPerChunk: avgTokens,
+								cost: cost.toFixed(4),
+							}),
+						});
+					}
+				}
+
+				// バックグラウンド自動Embedding
+				new Setting(containerEl)
+					.setName(t("settings.ragEmbeddingAutoIndex"))
+					.setDesc(t("settings.ragEmbeddingAutoIndexDesc"))
+					.addToggle((toggle) => {
+						toggle.setValue(this.plugin.settings.ragAutoIndex);
+						toggle.onChange(async (value) => {
+							this.plugin.settings.ragAutoIndex = value;
+							await this.plugin.saveSettings();
+						});
+					});
+
+				// Embeddingインデックス構築ボタン + 統計
+				const embeddingIndexSetting = new Setting(containerEl);
+				const embStats = this.plugin.ragManager?.getStats();
+				if (embStats && embStats.embeddingIndexed > 0) {
+					const size = this.plugin.formatBytes(embStats.embeddingStorageBytes);
+					embeddingIndexSetting.setName(t("settings.ragEmbeddingIndexStats", {
+						vectors: embStats.embeddingIndexed,
+						size,
+						model: embStats.embeddingModel ?? "",
+					}));
+					embeddingIndexSetting.addButton((btn) => {
+						btn.setButtonText(t("settings.ragBuildEmbeddingIndex"));
+						btn.onClick(async () => {
+							await this.buildEmbeddingIndex(btn);
+						});
+					});
+					embeddingIndexSetting.addButton((btn) => {
+						btn.setButtonText(t("settings.ragClearEmbeddingIndex"));
+						btn.setWarning();
+						btn.onClick(async () => {
+							await this.plugin.ragManager?.clearEmbeddingIndex();
+							new Notice(t("notice.ragIndexCleared"));
+							this.display();
+						});
+					});
+				} else {
+					embeddingIndexSetting.setName(t("settings.ragEmbeddingIndexNotBuilt"));
+					embeddingIndexSetting.addButton((btn) => {
+						btn.setButtonText(t("settings.ragBuildEmbeddingIndex"));
+						btn.setCta();
+						btn.onClick(async () => {
+							await this.buildEmbeddingIndex(btn);
+						});
+					});
+				}
+
+				// 累積トークン数表示
+				if (embStats && embStats.embeddingTotalTokensUsed > 0) {
+					const modelInfo = selectedProvider?.models.find(
+						(m) => m.id === this.plugin.settings.ragEmbeddingModel,
+					);
+					const costRate = modelInfo?.costPer1MTokens ?? 0;
+					const cost = (embStats.embeddingTotalTokensUsed / 1_000_000) * costRate;
+					const tokenEl = containerEl.createDiv({ cls: "llm-embedding-cost" });
+					tokenEl.createEl("small", {
+						text: t("settings.ragEmbeddingTotalTokens", {
+							tokens: embStats.embeddingTotalTokensUsed.toLocaleString(),
+							cost: cost.toFixed(4),
+						}),
+					});
+				}
+			}
 		}
 
 		// バージョン情報
@@ -509,6 +730,60 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			new Notice(`RAG index build failed: ${msg}`, 8000);
 		} finally {
 			btn.setButtonText(t("settings.ragBuildIndex"));
+			btn.setDisabled(false);
+		}
+	}
+
+	private async buildEmbeddingIndex(btn: { setButtonText(text: string): void; setDisabled(disabled: boolean): void }): Promise<void> {
+		if (!this.plugin.ragManager) {
+			await this.plugin.initializeRAG();
+		}
+		if (!this.plugin.ragManager) return;
+
+		// Embedding初期化（未初期化の場合）
+		if (!this.plugin.ragManager.isEmbeddingEnabled()) {
+			await this.plugin.ragManager.initializeEmbedding(
+				this.plugin.embeddingProviderRegistry,
+				this.plugin.settings.ragEmbeddingProvider,
+				this.plugin.settings.ragEmbeddingModel,
+				this.plugin.settings.ragEmbeddingCompactMode,
+			);
+		}
+
+		// TF-IDFインデックスがまだなら先に構築
+		if (!this.plugin.ragManager.isBuilt()) {
+			btn.setButtonText(t("settings.ragBuildingIndex"));
+			btn.setDisabled(true);
+			await this.plugin.ragManager.buildIndex();
+		}
+
+		// Embedding用APIキー取得
+		const providerId = this.plugin.settings.ragEmbeddingProvider;
+		const keyId = this.plugin.settings.ragEmbeddingUseSharedKey ? providerId : `embedding-${providerId}`;
+		const apiKey = await this.plugin.secretManager.getApiKey(keyId) ?? "";
+		if (!apiKey && providerId !== "ollama") {
+			new Notice(t("error.apiKeyNotSet", { name: providerId }));
+			btn.setDisabled(false);
+			return;
+		}
+
+		btn.setButtonText(t("settings.ragBuildingEmbeddingIndex"));
+		btn.setDisabled(true);
+		try {
+			await this.plugin.ragManager.buildEmbeddingIndex(apiKey, (current, total) => {
+				if (current % 50 === 0 || current === total) {
+					btn.setButtonText(`${t("settings.ragBuildingEmbeddingIndex")} (${current}/${total})`);
+				}
+			});
+			const stats = this.plugin.ragManager.getStats();
+			const size = this.plugin.formatBytes(stats.embeddingStorageBytes);
+			new Notice(t("notice.ragEmbeddingComplete", { vectors: stats.embeddingIndexed, size }));
+			this.display();
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			new Notice(t("notice.ragEmbeddingFailed", { error: msg }), 8000);
+		} finally {
+			btn.setButtonText(t("settings.ragBuildEmbeddingIndex"));
 			btn.setDisabled(false);
 		}
 	}

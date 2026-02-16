@@ -1,17 +1,23 @@
 /**
  * RAGManager — RAGオーケストレーター
  *
+ * Phase 1: TF-IDF全文検索
+ * Phase 2: Embedding検索 + ハイブリッドRAG (RRF)
+ *
  * - Vault全体のインデックス構築・増分更新・検索を統括
  * - vault_searchツールの実行ロジックもここに集約（ChatViewは薄いディスパッチャー）
  * - Vaultイベントリスナーで自動増分更新（デバウンス500ms）
  */
 
-import type { App, TFile } from "obsidian";
+import type { App } from "obsidian";
 import type { DocumentChunk, SearchResult, IndexStats } from "./types";
 import { chunkDocument, type ChunkStrategy } from "./ChunkManager";
 import { TextSearchEngine } from "./TextSearchEngine";
 import type { VaultReader } from "../vault/VaultReader";
 import { t } from "../i18n";
+import type { EmbeddingProvider, EmbeddingProviderRegistry } from "./EmbeddingProvider";
+import { VectorStore } from "./VectorStore";
+import { HybridSearchEngine } from "./HybridSearchEngine";
 
 export class RAGManager {
 	private app: App;
@@ -27,6 +33,22 @@ export class RAGManager {
 	private chunkStrategy: ChunkStrategy;
 	private chunkMaxTokens: number;
 	private excludeFolders: string[];
+
+	// Phase 2: Embedding
+	private vectorStore: VectorStore | null = null;
+	private embeddingProvider: EmbeddingProvider | null = null;
+	private hybridEngine: HybridSearchEngine | null = null;
+	private embeddingEnabled = false;
+	private embeddingProviderId = "";
+	private embeddingModel = "";
+	private embeddingDimensions = 0;
+	private chunkMap: Map<string, DocumentChunk> = new Map();
+
+	// バックグラウンド自動Embedding
+	private autoIndexEnabled = false;
+	private autoIndexTimer: ReturnType<typeof setTimeout> | null = null;
+	private idleTimer: ReturnType<typeof setTimeout> | null = null;
+	private idleListeners: Array<() => void> = [];
 
 	// Vaultイベント用デバウンス
 	private updateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -77,6 +99,220 @@ export class RAGManager {
 		}
 	}
 
+	// --- Phase 2: Embedding初期化 ---
+
+	/**
+	 * Embedding検索を初期化
+	 */
+	async initializeEmbedding(
+		providerRegistry: EmbeddingProviderRegistry,
+		providerId: string,
+		model: string,
+		compact = false,
+	): Promise<void> {
+		const provider = providerRegistry.get(providerId);
+		if (!provider) {
+			console.warn(`Embedding provider "${providerId}" not found`);
+			return;
+		}
+
+		this.embeddingProvider = provider;
+		this.embeddingProviderId = providerId;
+		this.embeddingModel = model;
+		this.embeddingDimensions = provider.getDimensions(model, compact);
+		this.embeddingEnabled = true;
+
+		// VectorStore初期化
+		this.vectorStore = new VectorStore(this.app);
+		await this.vectorStore.loadMetadata();
+
+		// モデル変更チェック
+		if (this.vectorStore.isModelChanged(model, this.embeddingDimensions)) {
+			console.warn("Embedding model changed, index rebuild required");
+		}
+		this.vectorStore.setModelInfo(providerId, model, this.embeddingDimensions);
+
+		// HybridSearchEngine初期化
+		this.hybridEngine = new HybridSearchEngine(
+			this.searchEngine,
+			this.vectorStore,
+			this.embeddingProvider,
+		);
+	}
+
+	/**
+	 * VectorStoreをディスクから復元
+	 */
+	async loadVectorStore(): Promise<void> {
+		if (!this.vectorStore) return;
+		await this.vectorStore.loadAllShardsProgressive();
+	}
+
+	/**
+	 * Embeddingインデックスを構築
+	 */
+	async buildEmbeddingIndex(
+		apiKey: string,
+		onProgress?: (current: number, total: number) => void,
+	): Promise<void> {
+		if (!this.vectorStore || !this.embeddingProvider) return;
+		if (this.isIndexing) return;
+
+		this.isIndexing = true;
+		try {
+			// モデル変更時は全ベクトル削除して再構築
+			if (this.vectorStore.isModelChanged(this.embeddingModel, this.embeddingDimensions)) {
+				await this.vectorStore.clear();
+				this.vectorStore.setModelInfo(
+					this.embeddingProviderId,
+					this.embeddingModel,
+					this.embeddingDimensions,
+				);
+			}
+
+			// 未処理チャンクを抽出
+			const pendingChunks: Array<{ id: string; content: string }> = [];
+			for (const [chunkId, chunk] of this.chunkMap) {
+				if (!this.vectorStore.has(chunkId)) {
+					pendingChunks.push({ id: chunkId, content: chunk.content });
+				}
+			}
+
+			if (pendingChunks.length === 0) {
+				onProgress?.(0, 0);
+				return;
+			}
+
+			const total = pendingChunks.length;
+			const BATCH_SIZE = 100;
+
+			for (let i = 0; i < pendingChunks.length; i += BATCH_SIZE) {
+				const batch = pendingChunks.slice(i, i + BATCH_SIZE);
+				const texts = batch.map((c) => c.content);
+
+				try {
+					const result = await this.embeddingProvider.embed(
+						texts, apiKey, this.embeddingModel, this.embeddingDimensions,
+					);
+					for (let j = 0; j < batch.length; j++) {
+						const vec = new Float32Array(result.embeddings[j]);
+						this.vectorStore.set(batch[j].id, vec);
+					}
+					this.vectorStore.addTokensUsed(result.totalTokens);
+				} catch (e) {
+					console.warn(`Embedding batch ${i}-${i + batch.length} failed, skipping:`, e);
+				}
+
+				onProgress?.(Math.min(i + batch.length, total), total);
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+
+			await this.vectorStore.save();
+		} finally {
+			this.isIndexing = false;
+		}
+	}
+
+	/**
+	 * Embeddingインデックスをクリア
+	 */
+	async clearEmbeddingIndex(): Promise<void> {
+		if (this.vectorStore) {
+			await this.vectorStore.clear();
+		}
+	}
+
+	// --- バックグラウンド自動Embedding ---
+
+	/**
+	 * バックグラウンド自動Embeddingを開始
+	 */
+	startAutoEmbedding(apiKey: string): void {
+		this.autoIndexEnabled = true;
+		this.setupIdleDetection(apiKey);
+	}
+
+	/**
+	 * バックグラウンド自動Embeddingを停止
+	 */
+	stopAutoEmbedding(): void {
+		this.autoIndexEnabled = false;
+		this.cleanupIdleDetection();
+	}
+
+	private setupIdleDetection(apiKey: string): void {
+		const IDLE_TIMEOUT = 30_000; // 30秒
+
+		const resetIdle = () => {
+			if (this.idleTimer) clearTimeout(this.idleTimer);
+			this.idleTimer = setTimeout(() => {
+				this.runAutoEmbedBatch(apiKey);
+			}, IDLE_TIMEOUT);
+		};
+
+		const events = ["mousemove", "keydown", "touchstart"];
+		for (const event of events) {
+			const listener = () => resetIdle();
+			document.addEventListener(event, listener, { passive: true });
+			this.idleListeners.push(() => document.removeEventListener(event, listener));
+		}
+
+		resetIdle();
+	}
+
+	private cleanupIdleDetection(): void {
+		if (this.idleTimer) {
+			clearTimeout(this.idleTimer);
+			this.idleTimer = null;
+		}
+		for (const cleanup of this.idleListeners) {
+			cleanup();
+		}
+		this.idleListeners = [];
+	}
+
+	private async runAutoEmbedBatch(apiKey: string): Promise<void> {
+		if (!this.autoIndexEnabled || !this.vectorStore || !this.embeddingProvider) return;
+		if (this.isIndexing) return;
+
+		// 未処理チャンクを最大100件処理
+		const pendingChunks: Array<{ id: string; content: string }> = [];
+		for (const [chunkId, chunk] of this.chunkMap) {
+			if (!this.vectorStore.has(chunkId)) {
+				pendingChunks.push({ id: chunkId, content: chunk.content });
+			}
+			if (pendingChunks.length >= 100) break;
+		}
+
+		if (pendingChunks.length === 0) return;
+
+		const BATCH_SIZE = 10;
+		for (let i = 0; i < pendingChunks.length; i += BATCH_SIZE) {
+			if (!this.autoIndexEnabled) return; // ユーザー操作で中断
+			const batch = pendingChunks.slice(i, i + BATCH_SIZE);
+			const texts = batch.map((c) => c.content);
+
+			try {
+				const result = await this.embeddingProvider.embed(
+					texts, apiKey, this.embeddingModel, this.embeddingDimensions,
+				);
+				for (let j = 0; j < batch.length; j++) {
+					const vec = new Float32Array(result.embeddings[j]);
+					this.vectorStore!.set(batch[j].id, vec);
+				}
+				this.vectorStore!.addTokensUsed(result.totalTokens);
+			} catch (e) {
+				console.warn("Auto-embed batch failed:", e);
+				return;
+			}
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
+
+		await this.vectorStore.save();
+	}
+
+	// --- インデックス構築 ---
+
 	/**
 	 * Vault全体のインデックスを構築
 	 */
@@ -87,6 +323,7 @@ export class RAGManager {
 		try {
 			this.searchEngine.clear();
 			this.fileHashes.clear();
+			this.chunkMap.clear();
 
 			const allFiles = this.vaultReader.getAllMarkdownFiles()
 				.filter((f) => !this.isExcluded(f.path));
@@ -119,6 +356,11 @@ export class RAGManager {
 				}
 			}
 
+			// チャンクマップ構築（ベクトル検索結果→DocumentChunk解決用）
+			for (const chunk of allChunks) {
+				this.chunkMap.set(chunk.id, chunk);
+			}
+
 			// 検索エンジンにチャンクを登録
 			await this.searchEngine.addChunks(allChunks, () =>
 				new Promise((resolve) => setTimeout(resolve, 0)),
@@ -140,16 +382,26 @@ export class RAGManager {
 		const file = this.vaultReader.getFileByPath(filePath);
 		if (!file) return;
 
-		const content = await this.vaultReader.cachedReadFile(file);
+		const content = await this.vaultReader.readFile(file);
 		const newHash = await this.computeHash(content);
 		const oldHash = this.fileHashes.get(filePath);
 
 		// ハッシュが同じなら更新不要
 		if (oldHash === newHash) return;
 
-		// 旧チャンクを削除して新チャンクを追加
+		// 旧チャンクを削除
 		this.searchEngine.removeFile(filePath);
 		this.fileHashes.set(filePath, newHash);
+
+		// chunkMapから旧チャンクを削除
+		for (const chunkId of this.chunkMap.keys()) {
+			if (chunkId.startsWith(`${filePath}::`)) {
+				this.chunkMap.delete(chunkId);
+			}
+		}
+
+		// VectorStoreから旧ベクトルを削除（新ベクトルは次回構築時に生成）
+		this.vectorStore?.removeByFilePath(filePath);
 
 		const chunks = chunkDocument(
 			filePath,
@@ -158,6 +410,11 @@ export class RAGManager {
 			this.chunkStrategy,
 			this.chunkMaxTokens,
 		);
+
+		// 新チャンクをchunkMapに追加
+		for (const chunk of chunks) {
+			this.chunkMap.set(chunk.id, chunk);
+		}
 
 		await this.searchEngine.addChunks(chunks);
 	}
@@ -169,18 +426,39 @@ export class RAGManager {
 		if (!this.indexBuilt) return;
 		this.searchEngine.removeFile(filePath);
 		this.fileHashes.delete(filePath);
+		this.vectorStore?.removeByFilePath(filePath);
+
+		// chunkMapから該当ファイルのエントリを削除
+		for (const chunkId of this.chunkMap.keys()) {
+			if (chunkId.startsWith(`${filePath}::`)) {
+				this.chunkMap.delete(chunkId);
+			}
+		}
 	}
 
 	/**
-	 * 検索を実行
+	 * 検索を実行（Phase 2: async化）
 	 */
-	search(query: string, topK?: number, minScore?: number): SearchResult[] {
+	async search(query: string, topK?: number, minScore?: number, apiKey?: string): Promise<SearchResult[]> {
 		if (!this.indexBuilt) return [];
-		return this.searchEngine.search(
-			query,
-			topK ?? this.topK,
-			minScore ?? this.minScore,
-		);
+
+		const k = topK ?? this.topK;
+		const score = minScore ?? this.minScore;
+
+		// Embedding有効 + VectorStore構築済み + APIキーあり → ハイブリッド検索
+		if (this.embeddingEnabled && this.vectorStore && this.hybridEngine && apiKey && this.vectorStore.size > 0) {
+			try {
+				return await this.hybridEngine.search(
+					query, apiKey, this.embeddingModel,
+					k, score, this.chunkMap, this.embeddingDimensions,
+				);
+			} catch (e) {
+				console.warn("Embedding search failed, falling back to text search:", e);
+			}
+		}
+
+		// TF-IDFのみ
+		return this.searchEngine.search(query, k, score);
 	}
 
 	/**
@@ -203,12 +481,11 @@ export class RAGManager {
 	}
 
 	/**
-	 * vault_searchツールの実行ロジック
-	 * ChatViewからの薄いディスパッチャーとして使用
+	 * vault_searchツールの実行ロジック（Phase 2: async化）
 	 */
-	executeToolSearch(query: string, topK?: number): string {
+	async executeToolSearch(query: string, topK?: number, apiKey?: string): Promise<string> {
 		const k = Math.min(topK ?? this.topK, 10);
-		const results = this.search(query, k);
+		const results = await this.search(query, k, undefined, apiKey);
 
 		if (results.length === 0) {
 			return t("rag.noResults", { query });
@@ -253,6 +530,7 @@ export class RAGManager {
 	clearIndex(): void {
 		this.searchEngine.clear();
 		this.fileHashes.clear();
+		this.chunkMap.clear();
 		this.indexBuilt = false;
 	}
 
@@ -271,26 +549,48 @@ export class RAGManager {
 	}
 
 	/**
+	 * Embedding有効かどうか
+	 */
+	isEmbeddingEnabled(): boolean {
+		return this.embeddingEnabled;
+	}
+
+	/**
 	 * 統計情報
 	 */
 	getStats(): IndexStats {
+		const vectorStats = this.vectorStore?.getStats();
 		return {
 			totalFiles: this.vaultReader.getAllMarkdownFiles().length,
 			totalChunks: this.searchEngine.getDocumentCount(),
 			indexedFiles: this.fileHashes.size,
 			lastUpdated: Date.now(),
-			storageSizeBytes: 0, // メモリ内のため正確な値は不明
+			storageSizeBytes: 0,
+			embeddingIndexed: vectorStats?.vectorCount ?? 0,
+			embeddingModel: vectorStats?.model,
+			embeddingStorageBytes: vectorStats?.storageSizeBytes ?? 0,
+			embeddingTotalTokensUsed: vectorStats?.totalTokensUsed ?? 0,
 		};
 	}
 
 	/**
-	 * クリーンアップ（デバウンスタイマーをすべてクリア）
+	 * クリーンアップ
 	 */
-	destroy(): void {
+	async destroy(): Promise<void> {
 		for (const timer of this.updateTimers.values()) {
 			clearTimeout(timer);
 		}
 		this.updateTimers.clear();
+		this.cleanupIdleDetection();
+
+		// VectorStoreの未保存変更を永続化
+		if (this.vectorStore) {
+			try {
+				await this.vectorStore.save();
+			} catch (e) {
+				console.warn("VectorStore save on destroy failed:", e);
+			}
+		}
 	}
 
 	/**

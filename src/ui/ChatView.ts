@@ -524,10 +524,13 @@ export class ChatView extends ItemView {
 		}
 
 		// 3. Vault全体のファイル一覧（コンパクト化: 最大200件）
-		const vaultFiles = this.plugin.vaultReader.getVaultFileList(200);
-		if (vaultFiles.length > 0) {
-			const fileList = vaultFiles.join("\n");
-			parts.push(`${t("context.vaultFiles")}\n${fileList}`);
+		// RAG有効 & インデックス構築済みの場合はスキップ（RAG検索で代替）
+		if (!this.plugin.ragManager?.isBuilt()) {
+			const vaultFiles = this.plugin.vaultReader.getVaultFileList(200);
+			if (vaultFiles.length > 0) {
+				const fileList = vaultFiles.join("\n");
+				parts.push(`${t("context.vaultFiles")}\n${fileList}`);
+			}
 		}
 
 		// 4. コンテキスト（手動添付ノート）
@@ -564,7 +567,8 @@ export class ChatView extends ItemView {
 
 		// 7. RAG自動検索結果を注入（有効かつインデックス構築済みの場合）
 		if (this.plugin.ragManager?.isBuilt()) {
-			const ragResults = this.plugin.ragManager.search(userText);
+			const embeddingApiKey = await this.getEmbeddingApiKey();
+			const ragResults = await this.plugin.ragManager.search(userText, undefined, undefined, embeddingApiKey);
 			if (ragResults.length > 0) {
 				const ragContext = this.plugin.ragManager.buildRAGContext(ragResults);
 				parts.push(ragContext);
@@ -765,7 +769,8 @@ export class ChatView extends ItemView {
 					// vault_search: RAGManagerに委譲
 					const query = toolUse.input.query as string;
 					const topK = toolUse.input.topK as number | undefined;
-					const searchResult = this.plugin.ragManager?.executeToolSearch(query, topK)
+					const embeddingKey = await this.getEmbeddingApiKey();
+					const searchResult = (await this.plugin.ragManager?.executeToolSearch(query, topK, embeddingKey))
 						?? "RAG index not available. Please build the index first.";
 					toolResults.push({
 						toolUseId: toolUse.id, name: toolUse.name,
@@ -786,6 +791,19 @@ export class ChatView extends ItemView {
 	/**
 	 * 応答中の<vault_read>path</vault_read>タグからファイルパスを抽出
 	 */
+	/**
+	 * Embedding用APIキーを取得
+	 */
+	private async getEmbeddingApiKey(): Promise<string> {
+		if (!this.plugin.settings.ragEmbeddingEnabled) return "";
+		const providerId = this.plugin.settings.ragEmbeddingProvider;
+		if (providerId === "ollama") return "";
+		if (this.plugin.settings.ragEmbeddingUseSharedKey) {
+			return await this.plugin.secretManager.getApiKey(providerId) ?? "";
+		}
+		return await this.plugin.secretManager.getApiKey(`embedding-${providerId}`) ?? "";
+	}
+
 	private parseVaultReadTags(content: string): string[] {
 		const regex = /<vault_read>([^<]+)<\/vault_read>/g;
 		const paths: string[] = [];

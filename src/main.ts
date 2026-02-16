@@ -9,10 +9,12 @@ import { VaultReader } from "./vault/VaultReader";
 import { SecretManager, type SecurityLevel } from "./security/SecretManager";
 import { resolveLocale, setLocale, t } from "./i18n";
 import type { RAGManager } from "./rag/RAGManager";
+import { EmbeddingProviderRegistry } from "./rag/EmbeddingProvider";
 
 export default class LLMAssistantPlugin extends Plugin {
 	settings: LLMAssistantSettings = DEFAULT_SETTINGS;
 	providerRegistry: ProviderRegistry = new ProviderRegistry();
+	embeddingProviderRegistry: EmbeddingProviderRegistry = new EmbeddingProviderRegistry();
 	vaultReader: VaultReader;
 	secretManager: SecretManager;
 	ragManager: RAGManager | null = null;
@@ -78,6 +80,18 @@ export default class LLMAssistantPlugin extends Plugin {
 			}
 		}
 
+		// Embedding初期化（RAG有効 + Embedding有効時のみ）
+		if (this.settings.ragEnabled && this.settings.ragEmbeddingEnabled && this.ragManager) {
+			await this.ragManager.initializeEmbedding(
+				this.embeddingProviderRegistry,
+				this.settings.ragEmbeddingProvider,
+				this.settings.ragEmbeddingModel,
+				this.settings.ragEmbeddingCompactMode,
+			);
+			// VectorStoreをバックグラウンドで復元
+			this.ragManager.loadVectorStore();
+		}
+
 		// RAGインデックス構築コマンド
 		this.addCommand({
 			id: "build-rag-index",
@@ -103,6 +117,60 @@ export default class LLMAssistantPlugin extends Plugin {
 					files: stats.indexedFiles,
 					chunks: stats.totalChunks,
 				}));
+			},
+		});
+
+		// Embeddingインデックス構築コマンド
+		this.addCommand({
+			id: "build-embedding-index",
+			name: t("command.buildEmbeddingIndex"),
+			callback: async () => {
+				if (!this.settings.ragEmbeddingEnabled) {
+					new Notice(t("notice.ragNotEnabled"));
+					return;
+				}
+				if (!this.ragManager) {
+					await this.initializeRAG();
+				}
+				if (!this.ragManager) return;
+
+				// Embedding初期化（未初期化の場合）
+				if (!this.ragManager.isEmbeddingEnabled()) {
+					await this.ragManager.initializeEmbedding(
+						this.embeddingProviderRegistry,
+						this.settings.ragEmbeddingProvider,
+						this.settings.ragEmbeddingModel,
+						this.settings.ragEmbeddingCompactMode,
+					);
+				}
+
+				// TF-IDFインデックスがまだなら先に構築
+				if (!this.ragManager.isBuilt()) {
+					await this.ragManager.buildIndex();
+				}
+
+				// Embedding用APIキー取得
+				const providerId = this.settings.ragEmbeddingProvider;
+				const keyId = this.settings.ragEmbeddingUseSharedKey ? providerId : `embedding-${providerId}`;
+				const apiKey = await this.secretManager.getApiKey(keyId) ?? "";
+				if (!apiKey && providerId !== "ollama") {
+					new Notice(t("error.apiKeyNotSet", { name: providerId }));
+					return;
+				}
+
+				new Notice(t("notice.ragEmbeddingBuilding", { current: 0, total: "..." }));
+				try {
+					await this.ragManager.buildEmbeddingIndex(apiKey, (current, total) => {
+						if (current % 100 === 0 || current === total) {
+							new Notice(t("notice.ragEmbeddingBuilding", { current, total }));
+						}
+					});
+					const stats = this.ragManager.getStats();
+					const size = this.formatBytes(stats.embeddingStorageBytes);
+					new Notice(t("notice.ragEmbeddingComplete", { vectors: stats.embeddingIndexed, size }));
+				} catch (e) {
+					new Notice(t("notice.ragEmbeddingFailed", { error: (e as Error).message }));
+				}
 			},
 		});
 
@@ -133,9 +201,9 @@ export default class LLMAssistantPlugin extends Plugin {
 	}
 
 	async onunload(): Promise<void> {
-		// RAGManagerのクリーンアップ
+		// RAGManagerのクリーンアップ（VectorStore永続化含む）
 		if (this.ragManager) {
-			this.ragManager.destroy();
+			await this.ragManager.destroy();
 			this.ragManager = null;
 		}
 		// マスターパスワードをクリア
@@ -265,10 +333,19 @@ export default class LLMAssistantPlugin extends Plugin {
 	/**
 	 * RAGManagerの破棄
 	 */
-	destroyRAG(): void {
+	async destroyRAG(): Promise<void> {
 		if (this.ragManager) {
-			this.ragManager.destroy();
+			await this.ragManager.destroy();
 			this.ragManager = null;
 		}
+	}
+
+	/**
+	 * バイト数を人間が読みやすい形式に変換
+	 */
+	formatBytes(bytes: number): string {
+		if (bytes < 1024) return `${bytes}B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+		return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 	}
 }
