@@ -90,11 +90,26 @@ export class GeminiProvider implements LLMProvider {
 		return {};
 	}
 
-	buildAssistantToolUseMessage(content: string, toolUses: ToolUseBlock[]): Message {
+	buildAssistantToolUseMessage(content: string, toolUses: ToolUseBlock[], rawParts?: unknown[]): Message {
+		// Gemini 3: rawPartsが利用可能な場合はそのまま使用（thought_signature保持）
+		if (rawParts && rawParts.length > 0) {
+			return {
+				role: "assistant",
+				content: content || "",
+				rawContent: { role: "model", parts: rawParts },
+			};
+		}
+
+		// フォールバック: rawPartsがない場合は手動で構築
 		const parts: unknown[] = [];
 		if (content) parts.push({ text: content });
 		for (const tu of toolUses) {
-			parts.push({ functionCall: { name: tu.name, args: tu.input } });
+			if (tu.rawPart) {
+				// 個別のrawPartがあればそれを使用
+				parts.push(tu.rawPart);
+			} else {
+				parts.push({ functionCall: { name: tu.name, args: tu.input } });
+			}
 		}
 		return {
 			role: "assistant",

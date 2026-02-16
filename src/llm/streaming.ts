@@ -383,7 +383,7 @@ function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
 	const toolUses: ToolUseBlock[] = [];
 	if (parts) {
 		for (const part of parts) {
-			if (part.text) {
+			if (part.text && !part.thought) {
 				textContent += part.text as string;
 			}
 			if (part.functionCall) {
@@ -392,6 +392,7 @@ function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
 					id: `gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
 					name: (fc.name as string) || "",
 					input: (fc.args as Record<string, unknown>) || {},
+					rawPart: part, // Preserve full part including thoughtSignature (Gemini 3)
 				});
 			}
 		}
@@ -408,6 +409,8 @@ function parseGeminiResponse(json: Record<string, unknown>): ChatResponse {
 			: undefined,
 		finishReason: (candidates?.[0]?.finishReason as string) || undefined,
 		toolUses: toolUses.length > 0 ? toolUses : undefined,
+		// Preserve raw parts for Gemini 3 thought_signature reconstruction
+		rawAssistantParts: parts ? [...parts] : undefined,
 	};
 }
 
