@@ -71,11 +71,25 @@ export default class LLMAssistantPlugin extends Plugin {
 			if (this.ragManager) {
 				setTimeout(async () => {
 					if (!this.ragManager || this.ragManager.isBuilt()) return;
-					await this.ragManager.buildIndex((current, total) => {
-						if (current === total) {
-							new Notice(t("notice.ragIndexComplete", { files: total, chunks: this.ragManager?.getStats().totalChunks ?? 0 }));
+
+					// まずキャッシュからの復元を試行（変更ファイルのみ差分更新）
+					const deltaCount = await this.ragManager.buildIndexFromCache();
+
+					if (deltaCount === -1) {
+						// キャッシュなし or 設定変更 → フル再構築
+						await this.ragManager.buildIndex();
+						const stats = this.ragManager?.getStats();
+						if (stats) {
+							new Notice(t("notice.ragIndexComplete", { files: stats.indexedFiles, chunks: stats.totalChunks }));
 						}
-					});
+					} else if (deltaCount > 0) {
+						// キャッシュ復元 + 差分更新あり
+						const stats = this.ragManager?.getStats();
+						if (stats) {
+							new Notice(t("notice.ragIndexUpdated", { files: deltaCount, chunks: stats.totalChunks }));
+						}
+					}
+					// deltaCount === 0: 変更なし → Noticeなし（サイレント復元）
 				}, 2000); // 起動2秒後に開始
 			}
 		}
