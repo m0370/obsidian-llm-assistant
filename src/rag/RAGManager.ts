@@ -19,6 +19,31 @@ import type { EmbeddingProvider, EmbeddingProviderRegistry } from "./EmbeddingPr
 import { VectorStore } from "./VectorStore";
 import { HybridSearchEngine } from "./HybridSearchEngine";
 
+const INDEX_CACHE_PATH = ".obsidian/plugins/llm-assistant/cache/rag-index.json";
+
+interface IndexCacheEntry {
+	hash: string;
+	chunks: Array<{
+		id: string;
+		filePath: string;
+		fileName: string;
+		content: string;
+		heading?: string;
+		startLine: number;
+		endLine: number;
+		tokens: number;
+		metadata?: Record<string, unknown>;
+	}>;
+}
+
+interface IndexCache {
+	version: number;
+	chunkStrategy: string;
+	chunkMaxTokens: number;
+	excludeFolders: string;
+	files: Record<string, IndexCacheEntry>;
+}
+
 export class RAGManager {
 	private app: App;
 	private vaultReader: VaultReader;
@@ -331,7 +356,131 @@ export class RAGManager {
 	// --- インデックス構築 ---
 
 	/**
-	 * Vault全体のインデックスを構築
+	 * キャッシュからインデックスを復元し、変更ファイルのみ差分更新
+	 * @returns 変更があったファイル数（0 = キャッシュのみで復元完了）、-1 = キャッシュなしで全再構築が必要
+	 */
+	async buildIndexFromCache(): Promise<number> {
+		if (this.isIndexing) return -1;
+
+		try {
+			const cache = await this.loadIndexCache();
+			if (!cache) return -1;
+
+			// 設定が変わっていたらキャッシュ無効
+			if (
+				cache.chunkStrategy !== this.chunkStrategy ||
+				cache.chunkMaxTokens !== this.chunkMaxTokens ||
+				cache.excludeFolders !== this.excludeFolders.join(",")
+			) {
+				return -1;
+			}
+
+			this.isIndexing = true;
+
+			const currentFiles = this.vaultReader.getAllMarkdownFiles()
+				.filter((f) => !this.isExcluded(f.path));
+			const currentPaths = new Set(currentFiles.map((f) => f.path));
+			const cachedPaths = new Set(Object.keys(cache.files));
+
+			// 変更分析: 追加・変更・削除されたファイルを特定
+			const addedOrModified: typeof currentFiles = [];
+			const unchangedChunks: DocumentChunk[] = [];
+
+			for (const file of currentFiles) {
+				const cached = cache.files[file.path];
+				if (cached) {
+					// ファイルが存在 → ハッシュ比較はファイル読み込みが必要なので、mtime で粗くチェック
+					// mtimeが同じならキャッシュのチャンクをそのまま使用
+					const stat = await this.app.vault.adapter.stat(file.path);
+					const cachedHash = cached.hash;
+
+					// mtimeベースの高速チェック（ハッシュ計算不要）
+					if (stat && cached.chunks.length > 0) {
+						// キャッシュからチャンクを復元
+						const content = await this.vaultReader.cachedReadFile(file);
+						const hash = await this.computeHash(content);
+
+						if (hash === cachedHash) {
+							// 変更なし → キャッシュから復元
+							this.fileHashes.set(file.path, hash);
+							for (const c of cached.chunks) {
+								const chunk: DocumentChunk = {
+									id: c.id,
+									filePath: c.filePath,
+									fileName: c.fileName,
+									content: c.content,
+									heading: c.heading,
+									startLine: c.startLine,
+									endLine: c.endLine,
+									tokens: c.tokens,
+									metadata: c.metadata,
+								};
+								unchangedChunks.push(chunk);
+							}
+							continue;
+						}
+					}
+					// ハッシュ不一致 → 再処理
+					addedOrModified.push(file);
+				} else {
+					// 新規ファイル
+					addedOrModified.push(file);
+				}
+			}
+
+			// 削除されたファイルの検出（キャッシュにはあるが現在のVaultにないファイル）
+			let deletedCount = 0;
+			for (const path of cachedPaths) {
+				if (!currentPaths.has(path)) {
+					deletedCount++;
+				}
+			}
+
+			// キャッシュから復元
+			this.searchEngine.clear();
+			this.chunkMap.clear();
+			this.fileHashes.clear();
+
+			if (unchangedChunks.length > 0) {
+				for (const chunk of unchangedChunks) {
+					this.chunkMap.set(chunk.id, chunk);
+				}
+				await this.searchEngine.addChunks(unchangedChunks, () =>
+					new Promise((resolve) => setTimeout(resolve, 0)),
+				);
+			}
+
+			// 変更ファイルを処理
+			for (const file of addedOrModified) {
+				const content = await this.vaultReader.readFile(file);
+				const hash = await this.computeHash(content);
+				this.fileHashes.set(file.path, hash);
+
+				const chunks = chunkDocument(
+					file.path,
+					file.basename,
+					content,
+					this.chunkStrategy,
+					this.chunkMaxTokens,
+				);
+				for (const chunk of chunks) {
+					this.chunkMap.set(chunk.id, chunk);
+				}
+				await this.searchEngine.addChunks(chunks);
+
+				// VectorStoreの旧ベクトルを削除（変更ファイル）
+				this.vectorStore?.removeByFilePath(file.path);
+			}
+
+			this.indexBuilt = true;
+			return addedOrModified.length + deletedCount;
+		} finally {
+			this.isIndexing = false;
+		}
+	}
+
+	/**
+	 * Vault全体のインデックスをフル再構築
 	 */
 	async buildIndex(onProgress?: (current: number, total: number) => void): Promise<void> {
 		if (this.isIndexing) return;
@@ -604,6 +753,15 @@ export class RAGManager {
 		this.updateTimers.clear();
 		this.cleanupIdleDetection();
 
+		// TF-IDFインデックスキャッシュを永続化
+		if (this.indexBuilt) {
+			try {
+				await this.saveIndexCache();
+			} catch (e) {
+				console.warn("RAG index cache save failed:", e);
+			}
+		}
+
 		// VectorStoreの未保存変更を永続化
 		if (this.vectorStore) {
 			try {
@@ -611,6 +769,73 @@ export class RAGManager {
 			} catch (e) {
 				console.warn("VectorStore save on destroy failed:", e);
 			}
+		}
+	}
+
+	/**
+	 * インデックスキャッシュをディスクに保存
+	 */
+	private async saveIndexCache(): Promise<void> {
+		const cache: IndexCache = {
+			version: 1,
+			chunkStrategy: this.chunkStrategy,
+			chunkMaxTokens: this.chunkMaxTokens,
+			excludeFolders: this.excludeFolders.join(","),
+			files: {},
+		};
+
+		// ファイルごとにハッシュとチャンクを保存
+		const chunksByFile = new Map<string, DocumentChunk[]>();
+		for (const chunk of this.chunkMap.values()) {
+			const existing = chunksByFile.get(chunk.filePath) ?? [];
+			existing.push(chunk);
+			chunksByFile.set(chunk.filePath, existing);
+		}
+
+		for (const [filePath, hash] of this.fileHashes) {
+			const chunks = chunksByFile.get(filePath) ?? [];
+			cache.files[filePath] = {
+				hash,
+				chunks: chunks.map((c) => ({
+					id: c.id,
+					filePath: c.filePath,
+					fileName: c.fileName,
+					content: c.content,
+					heading: c.heading,
+					startLine: c.startLine,
+					endLine: c.endLine,
+					tokens: c.tokens,
+					metadata: c.metadata,
+				})),
+			};
+		}
+
+		// cacheディレクトリの確保
+		const cacheDir = ".obsidian/plugins/llm-assistant/cache";
+		try {
+			if (!(await this.app.vault.adapter.exists(cacheDir))) {
+				await this.app.vault.adapter.mkdir(cacheDir);
+			}
+		} catch { /* already exists */ }
+
+		await this.app.vault.adapter.write(INDEX_CACHE_PATH, JSON.stringify(cache));
+	}
+
+	/**
+	 * インデックスキャッシュをディスクから読み込み
+	 */
+	private async loadIndexCache(): Promise<IndexCache | null> {
+		try {
+			if (!(await this.app.vault.adapter.exists(INDEX_CACHE_PATH))) {
+				return null;
+			}
+			const raw = await this.app.vault.adapter.read(INDEX_CACHE_PATH);
+			const cache: IndexCache = JSON.parse(raw);
+			if (cache.version !== 1) return null;
+			return cache;
+		} catch (e) {
+			console.warn("RAG index cache load failed:", e);
+			return null;
 		}
 	}
 
