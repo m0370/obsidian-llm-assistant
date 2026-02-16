@@ -192,13 +192,40 @@ async function completeWithRequestUrl(
 		method: "POST",
 		headers: { ...headers, "Content-Type": "application/json" },
 		body: JSON.stringify(body),
+		throw: false,
 	});
 
 	if (response.status !== 200) {
-		if (response.status === 429) {
-			throw new RateLimitError(provider.id, response.text);
+		// エラーレスポンスから詳細メッセージを抽出
+		let detail = "";
+		try {
+			const errJson = response.json;
+			if (errJson?.error?.message) {
+				detail = errJson.error.message as string;
+			} else if (errJson?.error?.status) {
+				detail = `${errJson.error.status}: ${errJson.error.message || ""}`;
+			} else {
+				detail = response.text || `HTTP ${response.status}`;
+			}
+		} catch {
+			detail = response.text || `HTTP ${response.status}`;
 		}
-		throw new Error(`API Error (${response.status}): ${response.text}`);
+
+		if (response.status === 429) {
+			throw new RateLimitError(provider.id, detail);
+		}
+
+		// 400エラー + ツール付きリクエスト → ツールなしでリトライ
+		if (response.status === 400 && params.tools && params.tools.length > 0) {
+			return completeWithRequestUrl(
+				provider,
+				{ ...params, tools: undefined },
+				apiKey,
+				onToken,
+			);
+		}
+
+		throw new Error(`${provider.name} API Error (${response.status}): ${detail}`);
 	}
 
 	let result: ChatResponse;
