@@ -1,4 +1,4 @@
-import { requestUrl, Platform } from "obsidian";
+import { requestUrl } from "obsidian";
 import type { LLMProvider, ChatRequest, ChatResponse, ToolUseBlock } from "./LLMProvider";
 import type { GeminiProvider } from "./GeminiProvider";
 
@@ -54,15 +54,11 @@ export async function sendRequest(
 	const wantStream = params.stream !== false && onToken !== undefined && !hasTools;
 
 	if (wantStream && provider.supportsCORS) {
-		if (Platform.isDesktop) {
-			// デスクトップ + CORS対応 → fetch() SSE
-			return streamWithFetch(provider, params, trimmedKey, onToken);
-		}
-		// モバイル + CORS対応 → fetch()試行 → フォールバック
+		// デスクトップ/モバイル共通: fetch() SSE試行 → requestUrl()フォールバック
 		try {
 			return await streamWithFetch(provider, params, trimmedKey, onToken);
 		} catch {
-			// CORSエラー等で失敗 → requestUrl()フォールバック
+			// fetch()失敗（CSP制約・接続エラー等）→ requestUrl()一括受信にフォールバック
 			return completeWithRequestUrl(provider, params, trimmedKey, onToken);
 		}
 	}
