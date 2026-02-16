@@ -16,6 +16,17 @@ export const DEFAULT_SETTINGS: LLMAssistantSettings = {
 	customModelId: "",
 	language: "auto",
 	fontSize: "medium",
+	// RAG設定
+	ragEnabled: false,
+	ragTopK: 5,
+	ragMinScore: 0.3,
+	ragChunkStrategy: "section",
+	ragChunkMaxTokens: 512,
+	ragExcludeFolders: "",
+	ragEmbeddingEnabled: false,
+	ragEmbeddingProvider: "openai",
+	ragEmbeddingModel: "text-embedding-3-small",
+	ragAutoIndex: false,
 };
 
 export interface LLMAssistantSettings {
@@ -30,6 +41,18 @@ export interface LLMAssistantSettings {
 	customModelId: string;
 	language: "auto" | "en" | "ja";
 	fontSize: "small" | "medium" | "large";
+	// RAG設定
+	ragEnabled: boolean;
+	ragTopK: number;
+	ragMinScore: number;
+	ragChunkStrategy: "section" | "paragraph" | "fixed";
+	ragChunkMaxTokens: number;
+	ragExcludeFolders: string;
+	// Phase 2用（デフォルト値のみ先に定義）
+	ragEmbeddingEnabled: boolean;
+	ragEmbeddingProvider: string;
+	ragEmbeddingModel: string;
+	ragAutoIndex: boolean;
 }
 
 export interface ProviderConfig {
