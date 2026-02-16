@@ -309,6 +309,138 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			});
 
+		// RAG設定
+		containerEl.createEl("h3", { text: t("settings.rag") });
+
+		new Setting(containerEl)
+			.setName(t("settings.ragEnabled"))
+			.setDesc(t("settings.ragEnabledDesc"))
+			.addToggle((toggle) => {
+				toggle.setValue(this.plugin.settings.ragEnabled);
+				toggle.onChange(async (value) => {
+					this.plugin.settings.ragEnabled = value;
+					await this.plugin.saveSettings();
+					if (value) {
+						await this.plugin.initializeRAG();
+					} else {
+						this.plugin.destroyRAG();
+					}
+					this.display();
+				});
+			});
+
+		if (this.plugin.settings.ragEnabled) {
+			new Setting(containerEl)
+				.setName(t("settings.ragTopK"))
+				.setDesc(t("settings.ragTopKDesc"))
+				.addSlider((slider) => {
+					slider.setLimits(1, 20, 1);
+					slider.setValue(this.plugin.settings.ragTopK);
+					slider.setDynamicTooltip();
+					slider.onChange(async (value) => {
+						this.plugin.settings.ragTopK = value;
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ topK: value });
+					});
+				});
+
+			new Setting(containerEl)
+				.setName(t("settings.ragMinScore"))
+				.setDesc(t("settings.ragMinScoreDesc"))
+				.addSlider((slider) => {
+					slider.setLimits(0, 1, 0.05);
+					slider.setValue(this.plugin.settings.ragMinScore);
+					slider.setDynamicTooltip();
+					slider.onChange(async (value) => {
+						this.plugin.settings.ragMinScore = value;
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ minScore: value });
+					});
+				});
+
+			new Setting(containerEl)
+				.setName(t("settings.ragChunkStrategy"))
+				.setDesc(t("settings.ragChunkStrategyDesc"))
+				.addDropdown((dropdown) => {
+					dropdown.addOption("section", t("settings.ragChunkSection"));
+					dropdown.addOption("paragraph", t("settings.ragChunkParagraph"));
+					dropdown.addOption("fixed", t("settings.ragChunkFixed"));
+					dropdown.setValue(this.plugin.settings.ragChunkStrategy);
+					dropdown.onChange(async (value) => {
+						this.plugin.settings.ragChunkStrategy = value as "section" | "paragraph" | "fixed";
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ chunkStrategy: value as "section" | "paragraph" | "fixed" });
+					});
+				});
+
+			new Setting(containerEl)
+				.setName(t("settings.ragChunkMaxTokens"))
+				.setDesc(t("settings.ragChunkMaxTokensDesc"))
+				.addSlider((slider) => {
+					slider.setLimits(128, 2048, 64);
+					slider.setValue(this.plugin.settings.ragChunkMaxTokens);
+					slider.setDynamicTooltip();
+					slider.onChange(async (value) => {
+						this.plugin.settings.ragChunkMaxTokens = value;
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ chunkMaxTokens: value });
+					});
+				});
+
+			new Setting(containerEl)
+				.setName(t("settings.ragExcludeFolders"))
+				.setDesc(t("settings.ragExcludeFoldersDesc"))
+				.addText((text) => {
+					text.inputEl.style.width = "100%";
+					text.setPlaceholder("Private, Work/Confidential");
+					text.setValue(this.plugin.settings.ragExcludeFolders);
+					text.onChange(async (value) => {
+						this.plugin.settings.ragExcludeFolders = value;
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ excludeFolders: value });
+					});
+				});
+
+			// インデックス構築ボタン + 統計情報
+			const indexSetting = new Setting(containerEl);
+
+			if (this.plugin.ragManager?.isBuilt()) {
+				const stats = this.plugin.ragManager.getStats();
+				indexSetting.setName(t("settings.ragIndexStats", {
+					files: stats.indexedFiles,
+					chunks: stats.totalChunks,
+				}));
+				indexSetting.addButton((btn) => {
+					btn.setButtonText(t("settings.ragRebuildIndex"));
+					btn.onClick(async () => {
+						await this.buildRAGIndex(btn);
+					});
+				});
+				indexSetting.addButton((btn) => {
+					btn.setButtonText(t("settings.ragClearIndex"));
+					btn.setWarning();
+					btn.onClick(() => {
+						this.plugin.ragManager?.clearIndex();
+						new Notice(t("notice.ragIndexCleared"));
+						this.display();
+					});
+				});
+			} else {
+				indexSetting.setName(t("settings.ragIndexNotBuilt"));
+				indexSetting.addButton((btn) => {
+					btn.setButtonText(t("settings.ragBuildIndex"));
+					btn.setCta();
+					btn.onClick(async () => {
+						await this.buildRAGIndex(btn);
+					});
+				});
+			}
+
+			// Phase 2 予告
+			const noteEl = containerEl.createDiv({ cls: "llm-rag-note" });
+			noteEl.createEl("small", { text: t("settings.ragEmbeddingNote") });
+		}
+
 		// バージョン情報
 		const versionEl = containerEl.createEl("div", {
 			cls: "llm-settings-version",
@@ -348,6 +480,35 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			new Notice(t("notice.modelsRefreshFailed", { message: msg }), 8000);
 		} finally {
 			btn.setButtonText(t("settings.refreshModels"));
+			btn.setDisabled(false);
+		}
+	}
+
+	private async buildRAGIndex(btn: { setButtonText(text: string): void; setDisabled(disabled: boolean): void }): Promise<void> {
+		if (!this.plugin.ragManager) {
+			await this.plugin.initializeRAG();
+		}
+		if (!this.plugin.ragManager) return;
+
+		btn.setButtonText(t("settings.ragBuildingIndex"));
+		btn.setDisabled(true);
+		try {
+			await this.plugin.ragManager.buildIndex((current, total) => {
+				if (current % 100 === 0 || current === total) {
+					btn.setButtonText(`${t("settings.ragBuildingIndex")} (${current}/${total})`);
+				}
+			});
+			const stats = this.plugin.ragManager.getStats();
+			new Notice(t("notice.ragIndexComplete", {
+				files: stats.indexedFiles,
+				chunks: stats.totalChunks,
+			}));
+			this.display();
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			new Notice(`RAG index build failed: ${msg}`, 8000);
+		} finally {
+			btn.setButtonText(t("settings.ragBuildIndex"));
 			btn.setDisabled(false);
 		}
 	}

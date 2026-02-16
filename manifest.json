@@ -1,7 +1,7 @@
 {
 	"id": "llm-assistant",
 	"name": "LLM Assistant",
-	"version": "0.2.2",
+	"version": "0.3.0",
 	"minAppVersion": "1.11.4",
 	"description": "Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design with secure API key management.",
 	"author": "m0370",

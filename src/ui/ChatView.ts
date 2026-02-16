@@ -42,6 +42,20 @@ const VAULT_TOOLS: ToolDefinition[] = [
 	},
 ];
 
+/** vault_search ツール定義（RAG有効時のみ追加） */
+const VAULT_SEARCH_TOOL: ToolDefinition = {
+	name: "vault_search",
+	description: "Search the user's entire Obsidian vault for notes related to a topic. Returns the most relevant note sections. Use this when you need to find information across the vault.",
+	input_schema: {
+		type: "object",
+		properties: {
+			query: { type: "string", description: "Search query" },
+			topK: { type: "number", description: "Number of results (default: 5, max: 10)" },
+		},
+		required: ["query"],
+	},
+};
+
 interface EditHunk {
 	oldText: string;
 	newText: string;
@@ -548,6 +562,15 @@ export class ChatView extends ItemView {
 			}
 		}
 
+		// 7. RAG自動検索結果を注入（有効かつインデックス構築済みの場合）
+		if (this.plugin.ragManager?.isBuilt()) {
+			const ragResults = this.plugin.ragManager.search(userText);
+			if (ragResults.length > 0) {
+				const ragContext = this.plugin.ragManager.buildRAGContext(ragResults);
+				parts.push(ragContext);
+			}
+		}
+
 		return parts.join("\n\n");
 	}
 
@@ -661,6 +684,11 @@ export class ChatView extends ItemView {
 				messageComponent.updateContent(t("chat.readingFiles"));
 			}
 
+			// RAG有効時はvault_searchツールを追加
+			const tools = this.plugin.ragManager?.isBuilt()
+				? [...VAULT_TOOLS, VAULT_SEARCH_TOOL]
+				: VAULT_TOOLS;
+
 			const response = await sendRequest(
 				provider,
 				{
@@ -670,7 +698,7 @@ export class ChatView extends ItemView {
 					temperature: this.plugin.settings.temperature,
 					maxTokens: this.plugin.settings.maxTokens,
 					stream: false, // Tool Use はストリーミング不可（requestUrl一括受信）
-					tools: VAULT_TOOLS,
+					tools,
 				},
 				apiKey,
 				(token: string) => {
@@ -728,6 +756,16 @@ export class ChatView extends ItemView {
 					toolResults.push({
 						toolUseId: toolUse.id, name: toolUse.name,
 						content: "Edit proposal displayed to user for review.",
+					});
+				} else if (toolUse.name === "vault_search") {
+					// vault_search: RAGManagerに委譲
+					const query = toolUse.input.query as string;
+					const topK = toolUse.input.topK as number | undefined;
+					const searchResult = this.plugin.ragManager?.executeToolSearch(query, topK)
+						?? "RAG index not available. Please build the index first.";
+					toolResults.push({
+						toolUseId: toolUse.id, name: toolUse.name,
+						content: searchResult,
 					});
 				}
 			}
