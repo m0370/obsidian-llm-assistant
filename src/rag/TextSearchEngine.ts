@@ -143,8 +143,8 @@ export class TextSearchEngine {
 			}
 
 			if (count > 0) {
-				// スコアは出現回数 / コンテンツ長で正規化（0-1の範囲）
-				const score = Math.min(1, count / (lowerContent.length / 100));
+				// 密度ベーススコア: クエリ文字数×出現回数 / コンテンツ長（最低100で正規化）
+				const score = Math.min(1, (count * lowerQuery.length) / Math.max(lowerContent.length, 100));
 				scored.push({ entry: doc, score });
 			}
 		}
