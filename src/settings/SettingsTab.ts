@@ -310,10 +310,19 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			});
 
-		// RAG設定
-		containerEl.createEl("h3", { text: t("settings.rag") });
+		// 「高度な設定」アコーディオン（RAG / Embedding）
+		const advancedDetailsEl = containerEl.createEl("details", {
+			cls: "llm-settings-advanced-details",
+		});
+		advancedDetailsEl.createEl("summary", {
+			text: t("settings.advancedAccordion"),
+			cls: "llm-settings-advanced-summary",
+		});
 
-		new Setting(containerEl)
+		// RAG設定
+		advancedDetailsEl.createEl("h3", { text: t("settings.rag") });
+
+		new Setting(advancedDetailsEl)
 			.setName(t("settings.ragEnabled"))
 			.setDesc(t("settings.ragEnabledDesc"))
 			.addToggle((toggle) => {
@@ -331,7 +340,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			});
 
 		if (this.plugin.settings.ragEnabled) {
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragTopK"))
 				.setDesc(t("settings.ragTopKDesc"))
 				.addSlider((slider) => {
@@ -345,7 +354,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					});
 				});
 
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragMinScore"))
 				.setDesc(t("settings.ragMinScoreDesc"))
 				.addSlider((slider) => {
@@ -359,7 +368,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					});
 				});
 
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragChunkStrategy"))
 				.setDesc(t("settings.ragChunkStrategyDesc"))
 				.addDropdown((dropdown) => {
@@ -374,7 +383,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					});
 				});
 
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragChunkMaxTokens"))
 				.setDesc(t("settings.ragChunkMaxTokensDesc"))
 				.addSlider((slider) => {
@@ -388,7 +397,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					});
 				});
 
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragExcludeFolders"))
 				.setDesc(t("settings.ragExcludeFoldersDesc"))
 				.addText((text) => {
@@ -403,7 +412,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 
 			// インデックス構築ボタン + 統計情報
-			const indexSetting = new Setting(containerEl);
+			const indexSetting = new Setting(advancedDetailsEl);
 
 			if (this.plugin.ragManager?.isBuilt()) {
 				const stats = this.plugin.ragManager.getStats();
@@ -438,9 +447,9 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			}
 
 			// --- Embedding検索セクション ---
-			containerEl.createEl("h4", { text: t("settings.ragEmbedding") });
+			advancedDetailsEl.createEl("h4", { text: t("settings.ragEmbedding") });
 
-			new Setting(containerEl)
+			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragEmbeddingEnabled"))
 				.setDesc(t("settings.ragEmbeddingEnabledDesc"))
 				.addToggle((toggle) => {
@@ -462,12 +471,12 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 
 			if (this.plugin.settings.ragEmbeddingEnabled) {
 				// プライバシー警告
-				const privacyNote = containerEl.createDiv({ cls: "llm-embedding-privacy-note" });
+				const privacyNote = advancedDetailsEl.createDiv({ cls: "llm-embedding-privacy-note" });
 				privacyNote.createEl("small", { text: t("settings.ragEmbeddingEnabledDesc") });
 
 				// Embeddingプロバイダー選択
 				const embeddingProviders = this.plugin.embeddingProviderRegistry.getAll();
-				new Setting(containerEl)
+				new Setting(advancedDetailsEl)
 					.setName(t("settings.ragEmbeddingProvider"))
 					.setDesc(t("settings.ragEmbeddingProviderDesc"))
 					.addDropdown((dropdown) => {
@@ -489,20 +498,20 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				// プロバイダーTip
 				const selectedProviderId = this.plugin.settings.ragEmbeddingProvider;
 				if (selectedProviderId === "gemini") {
-					const tipEl = containerEl.createDiv({ cls: "llm-rag-note" });
+					const tipEl = advancedDetailsEl.createDiv({ cls: "llm-rag-note" });
 					tipEl.createEl("small", { text: t("settings.ragEmbeddingGeminiTip") });
 				} else if (selectedProviderId === "ollama") {
-					const tipEl = containerEl.createDiv({ cls: "llm-rag-note" });
+					const tipEl = advancedDetailsEl.createDiv({ cls: "llm-rag-note" });
 					tipEl.createEl("small", { text: t("settings.ragEmbeddingOllamaTip") });
 					// モバイル警告: localhostはスマホ自身を指す
-					const mobileTipEl = containerEl.createDiv({ cls: "llm-embedding-privacy-note" });
+					const mobileTipEl = advancedDetailsEl.createDiv({ cls: "llm-embedding-privacy-note" });
 					mobileTipEl.createEl("small", { text: t("settings.ragEmbeddingOllamaMobileTip") });
 				}
 
 				// Embeddingモデル選択
 				const selectedProvider = this.plugin.embeddingProviderRegistry.get(selectedProviderId);
 				if (selectedProvider && selectedProvider.models.length > 0) {
-					new Setting(containerEl)
+					new Setting(advancedDetailsEl)
 						.setName(t("settings.ragEmbeddingModel"))
 						.addDropdown((dropdown) => {
 							for (const m of selectedProvider.models) {
@@ -519,7 +528,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 
 				// APIキー設定（Ollama以外）
 				if (selectedProvider && selectedProvider.requiresApiKey) {
-					new Setting(containerEl)
+					new Setting(advancedDetailsEl)
 						.setName(t("settings.ragEmbeddingUseSharedKey"))
 						.setDesc(t("settings.ragEmbeddingUseSharedKeyDesc"))
 						.addToggle((toggle) => {
@@ -534,7 +543,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					// 独立APIキー入力（共有キー無効時のみ）
 					if (!this.plugin.settings.ragEmbeddingUseSharedKey) {
 						const keyId = `embedding-${selectedProviderId}`;
-						const keySetting = new Setting(containerEl)
+						const keySetting = new Setting(advancedDetailsEl)
 							.setName(t("settings.ragEmbeddingApiKey"));
 						keySetting.addText((text) => {
 							text.inputEl.type = "password";
@@ -562,7 +571,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 						(m) => m.id === this.plugin.settings.ragEmbeddingModel,
 					);
 					if (modelInfo?.reducedDimensions) {
-						new Setting(containerEl)
+						new Setting(advancedDetailsEl)
 							.setName(t("settings.ragEmbeddingCompactMode"))
 							.setDesc(t("settings.ragEmbeddingCompactModeDesc"))
 							.addToggle((toggle) => {
@@ -583,7 +592,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					const stats = this.plugin.ragManager?.getStats();
 					const totalChunks = stats?.totalChunks ?? 0;
 					const avgTokens = Math.floor(this.plugin.settings.ragChunkMaxTokens / 2);
-					const costEl = containerEl.createDiv({ cls: "llm-embedding-cost" });
+					const costEl = advancedDetailsEl.createDiv({ cls: "llm-embedding-cost" });
 
 					if (modelInfo?.costPer1MTokens === 0) {
 						costEl.createEl("small", { text: t("settings.ragEmbeddingCostFree") });
@@ -600,7 +609,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				}
 
 				// バックグラウンド自動Embedding
-				new Setting(containerEl)
+				new Setting(advancedDetailsEl)
 					.setName(t("settings.ragEmbeddingAutoIndex"))
 					.setDesc(t("settings.ragEmbeddingAutoIndexDesc"))
 					.addToggle((toggle) => {
@@ -612,7 +621,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					});
 
 				// Embeddingインデックス構築ボタン + 統計
-				const embeddingIndexSetting = new Setting(containerEl);
+				const embeddingIndexSetting = new Setting(advancedDetailsEl);
 				const embStats = this.plugin.ragManager?.getStats();
 				if (embStats && embStats.embeddingIndexed > 0) {
 					const size = this.plugin.formatBytes(embStats.embeddingStorageBytes);
@@ -654,7 +663,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					);
 					const costRate = modelInfo?.costPer1MTokens ?? 0;
 					const cost = (embStats.embeddingTotalTokensUsed / 1_000_000) * costRate;
-					const tokenEl = containerEl.createDiv({ cls: "llm-embedding-cost" });
+					const tokenEl = advancedDetailsEl.createDiv({ cls: "llm-embedding-cost" });
 					tokenEl.createEl("small", {
 						text: t("settings.ragEmbeddingTotalTokens", {
 							tokens: embStats.embeddingTotalTokensUsed.toLocaleString(),
