@@ -1,4 +1,4 @@
-import { Menu, Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { VIEW_TYPE_CHAT, DEFAULT_SETTINGS, DISPLAY_NAME, getQuickActions } from "./constants";
 import type { LLMAssistantSettings } from "./constants";
 import { ChatView } from "./ui/ChatView";
@@ -8,12 +8,14 @@ import { CustomEndpointProvider } from "./llm/CustomEndpointProvider";
 import { VaultReader } from "./vault/VaultReader";
 import { SecretManager, type SecurityLevel } from "./security/SecretManager";
 import { resolveLocale, setLocale, t } from "./i18n";
+import type { RAGManager } from "./rag/RAGManager";
 
 export default class LLMAssistantPlugin extends Plugin {
 	settings: LLMAssistantSettings = DEFAULT_SETTINGS;
 	providerRegistry: ProviderRegistry = new ProviderRegistry();
 	vaultReader: VaultReader;
 	secretManager: SecretManager;
+	ragManager: RAGManager | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -60,6 +62,39 @@ export default class LLMAssistantPlugin extends Plugin {
 		// 設定タブ
 		this.addSettingTab(new LLMAssistantSettingTab(this.app, this));
 
+		// RAGの初期化（有効時のみ動的インポート）
+		if (this.settings.ragEnabled) {
+			await this.initializeRAG();
+		}
+
+		// RAGインデックス構築コマンド
+		this.addCommand({
+			id: "build-rag-index",
+			name: t("command.buildRagIndex"),
+			callback: async () => {
+				if (!this.ragManager) {
+					if (!this.settings.ragEnabled) {
+						new Notice(t("notice.ragNotEnabled"));
+						return;
+					}
+					await this.initializeRAG();
+				}
+				if (!this.ragManager) return;
+
+				new Notice(t("notice.ragIndexBuilding", { current: 0, total: "..." }));
+				await this.ragManager.buildIndex((current, total) => {
+					if (current % 50 === 0 || current === total) {
+						new Notice(t("notice.ragIndexBuilding", { current, total }));
+					}
+				});
+				const stats = this.ragManager.getStats();
+				new Notice(t("notice.ragIndexComplete", {
+					files: stats.indexedFiles,
+					chunks: stats.totalChunks,
+				}));
+			},
+		});
+
 		// クイックアクション（エディタコンテキストメニュー）
 		this.registerEvent(
 			this.app.workspace.on("editor-menu", (menu: Menu, editor) => {
@@ -87,6 +122,11 @@ export default class LLMAssistantPlugin extends Plugin {
 	}
 
 	async onunload(): Promise<void> {
+		// RAGManagerのクリーンアップ
+		if (this.ragManager) {
+			this.ragManager.destroy();
+			this.ragManager = null;
+		}
 		// マスターパスワードをクリア
 		this.secretManager.clearMasterPassword();
 		// ChatViewの全インスタンスをデタッチ
@@ -170,5 +210,54 @@ export default class LLMAssistantPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * RAGManagerの初期化（動的インポート）
+	 */
+	async initializeRAG(): Promise<void> {
+		if (this.ragManager) return;
+		const { RAGManager } = await import("./rag/RAGManager");
+		this.ragManager = new RAGManager(this.app, this.vaultReader, {
+			topK: this.settings.ragTopK,
+			minScore: this.settings.ragMinScore,
+			chunkStrategy: this.settings.ragChunkStrategy,
+			chunkMaxTokens: this.settings.ragChunkMaxTokens,
+			excludeFolders: this.settings.ragExcludeFolders,
+		});
+
+		// Vaultイベントリスナーを登録（自動増分更新）
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.ragManager?.debouncedUpdate(file.path);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.ragManager?.removeFileFromIndex(oldPath);
+					this.ragManager?.debouncedUpdate(file.path);
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile && file.extension === "md") {
+					this.ragManager?.removeFileFromIndex(file.path);
+				}
+			}),
+		);
+	}
+
+	/**
+	 * RAGManagerの破棄
+	 */
+	destroyRAG(): void {
+		if (this.ragManager) {
+			this.ragManager.destroy();
+			this.ragManager = null;
+		}
 	}
 }
