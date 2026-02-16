@@ -24,7 +24,9 @@ export interface EmbeddingProvider {
 	models: EmbeddingModelInfo[];
 	requiresApiKey: boolean;
 
+	/** バッチEmbedding生成（ドキュメント用） */
 	embed(texts: string[], apiKey: string, model: string, dimensions?: number): Promise<EmbedResult>;
+	/** 単一テキストEmbedding生成（クエリ用） */
 	embedSingle(text: string, apiKey: string, model: string, dimensions?: number): Promise<number[]>;
 	getDimensions(model: string, compact?: boolean): number;
 }
@@ -187,7 +189,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 			try {
 				const body: Record<string, unknown> = {
 					content: { parts: [{ text }] },
-					taskType: "SEMANTIC_SIMILARITY",
+					taskType: "RETRIEVAL_QUERY",
 				};
 				if (dimensions) {
 					body.outputDimensionality = dimensions;
@@ -242,7 +244,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 					const req: Record<string, unknown> = {
 						model: `models/${model}`,
 						content: { parts: [{ text }] },
-						taskType: "SEMANTIC_SIMILARITY",
+						taskType: "RETRIEVAL_DOCUMENT",
 					};
 					if (dimensions) {
 						req.outputDimensionality = dimensions;

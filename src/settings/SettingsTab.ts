@@ -494,6 +494,9 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				} else if (selectedProviderId === "ollama") {
 					const tipEl = containerEl.createDiv({ cls: "llm-rag-note" });
 					tipEl.createEl("small", { text: t("settings.ragEmbeddingOllamaTip") });
+					// モバイル警告: localhostはスマホ自身を指す
+					const mobileTipEl = containerEl.createDiv({ cls: "llm-embedding-privacy-note" });
+					mobileTipEl.createEl("small", { text: t("settings.ragEmbeddingOllamaMobileTip") });
 				}
 
 				// Embeddingモデル選択
