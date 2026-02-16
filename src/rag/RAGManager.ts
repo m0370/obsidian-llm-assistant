@@ -49,6 +49,7 @@ export class RAGManager {
 	private autoIndexTimer: ReturnType<typeof setTimeout> | null = null;
 	private idleTimer: ReturnType<typeof setTimeout> | null = null;
 	private idleListeners: Array<() => void> = [];
+	private priorityEmbedFiles: Set<string> = new Set(); // 編集されたファイルを優先Embedding
 
 	// Vaultイベント用デバウンス
 	private updateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -275,13 +276,29 @@ export class RAGManager {
 		if (!this.autoIndexEnabled || !this.vectorStore || !this.embeddingProvider) return;
 		if (this.isIndexing) return;
 
-		// 未処理チャンクを最大100件処理
+		// 編集されたファイルのチャンクを優先的に処理
 		const pendingChunks: Array<{ id: string; content: string }> = [];
-		for (const [chunkId, chunk] of this.chunkMap) {
-			if (!this.vectorStore.has(chunkId)) {
-				pendingChunks.push({ id: chunkId, content: chunk.content });
+		if (this.priorityEmbedFiles.size > 0) {
+			for (const filePath of this.priorityEmbedFiles) {
+				const prefix = `${filePath}::`;
+				for (const [chunkId, chunk] of this.chunkMap) {
+					if (chunkId.startsWith(prefix) && !this.vectorStore.has(chunkId)) {
+						pendingChunks.push({ id: chunkId, content: chunk.content });
+					}
+				}
 			}
+			this.priorityEmbedFiles.clear();
+		}
+
+		// 残りの未処理チャンクを追加（最大100件）
+		for (const [chunkId, chunk] of this.chunkMap) {
 			if (pendingChunks.length >= 100) break;
+			if (!this.vectorStore.has(chunkId)) {
+				// 既に優先キューに含まれている場合はスキップ
+				if (!pendingChunks.some((c) => c.id === chunkId)) {
+					pendingChunks.push({ id: chunkId, content: chunk.content });
+				}
+			}
 		}
 
 		if (pendingChunks.length === 0) return;
@@ -400,8 +417,12 @@ export class RAGManager {
 			}
 		}
 
-		// VectorStoreから旧ベクトルを削除（新ベクトルは次回構築時に生成）
+		// VectorStoreから旧ベクトルを削除
 		this.vectorStore?.removeByFilePath(filePath);
+		// 自動Embedding有効時は優先キューに追加（次回アイドル時に即座にEmbedding生成）
+		if (this.autoIndexEnabled) {
+			this.priorityEmbedFiles.add(filePath);
+		}
 
 		const chunks = chunkDocument(
 			filePath,

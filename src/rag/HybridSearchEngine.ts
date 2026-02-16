@@ -47,7 +47,8 @@ export class HybridSearchEngine {
 		chunks: Map<string, DocumentChunk>,
 		dimensions?: number,
 	): Promise<SearchResult[]> {
-		const expandedK = topK * 2;
+		// RRF用の候補プールは十分に確保（topKが小さい場合でも取りこぼし防止）
+		const expandedK = Math.max(topK * 2, 50);
 
 		// 1. TF-IDF検索
 		const textResults = this.textEngine.search(query, expandedK, minScore);

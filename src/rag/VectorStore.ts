@@ -13,11 +13,18 @@ import type { App } from "obsidian";
 
 export function encodeVector(vector: Float32Array): string {
 	const bytes = new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength);
-	let binary = "";
-	for (let i = 0; i < bytes.length; i++) {
-		binary += String.fromCharCode(bytes[i]);
+	// チャンク単位で変換（スタックオーバーフロー防止 + string concat最適化）
+	const CHUNK = 8192;
+	const parts: string[] = [];
+	for (let i = 0; i < bytes.length; i += CHUNK) {
+		const end = Math.min(i + CHUNK, bytes.length);
+		let segment = "";
+		for (let j = i; j < end; j++) {
+			segment += String.fromCharCode(bytes[j]);
+		}
+		parts.push(segment);
 	}
-	return btoa(binary);
+	return btoa(parts.join(""));
 }
 
 export function decodeVector(base64: string): Float32Array {
