@@ -291,7 +291,7 @@ export class ChatView extends ItemView {
 					new ConversationListModal(
 						this.app,
 						this.conversationManager,
-						(conversation) => this.loadConversation(conversation),
+						(conversation) => { void this.loadConversation(conversation); },
 					).open();
 				});
 		});
