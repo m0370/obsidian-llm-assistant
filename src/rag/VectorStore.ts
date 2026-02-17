@@ -68,9 +68,9 @@ export class VectorStore {
 	private metadataLoaded = false;
 	private maxShards = 1;
 
-	constructor(app: App, cacheDir = ".obsidian/plugins/llm-assistant/cache") {
+	constructor(app: App, cacheDir?: string) {
 		this.app = app;
-		this.cacheDir = cacheDir;
+		this.cacheDir = cacheDir ?? `${app.vault.configDir}/plugins/llm-assistant/cache`;
 		this.metadata = {
 			model: "",
 			dimensions: 0,

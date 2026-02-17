@@ -345,21 +345,8 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 				});
 
 				if (response.status !== 200) {
-					// Fallback: try fetch for Ollama (CORS-friendly local server)
-					try {
-						const fetchResponse = await fetch("http://localhost:11434/api/embed", {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ model, input: texts }),
-						});
-						if (!fetchResponse.ok) {
-							throw new Error(`Ollama Embedding error: ${fetchResponse.status}`);
-						}
-						const data = await fetchResponse.json();
-						return data.embeddings as number[][];
-					} catch (fetchError) {
-						throw new Error(`Ollama Embedding error: ${(fetchError as Error).message}`);
-					}
+					const errorMsg = response.text || `HTTP ${response.status}`;
+					throw new Error(`Ollama Embedding error: ${errorMsg}`);
 				}
 
 				return response.json.embeddings as number[][];

@@ -1,5 +1,5 @@
 import type { TFile } from "obsidian";
-import type { VaultReader, FileContent } from "./VaultReader";
+import type { VaultReader } from "./VaultReader";
 import { estimateTokens, formatTokenCount } from "../utils/TokenCounter";
 import { t } from "../i18n";
 

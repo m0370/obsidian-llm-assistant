@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import "../obsidian.d";
 import { encryptApiKey, decryptApiKey, type EncryptedData } from "./WebCryptoFallback";
 
 export type SecurityLevel = "secretstorage" | "webcrypto";
@@ -64,8 +65,7 @@ export class SecretManager {
 	 * SecretStorage APIが利用可能か
 	 */
 	isSecretStorageAvailable(): boolean {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		return !!(this.app as any).secretStorage;
+		return !!this.app.secretStorage;
 	}
 
 	/**
@@ -112,8 +112,7 @@ export class SecretManager {
 	// --- SecretStorage API ---
 
 	private async saveWithSecretStorage(providerId: string, apiKey: string): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const secretStorage = (this.app as any).secretStorage;
+		const secretStorage = this.app.secretStorage;
 		if (!secretStorage) {
 			throw new Error("SecretStorage APIが利用できません");
 		}
@@ -122,8 +121,7 @@ export class SecretManager {
 	}
 
 	private async getFromSecretStorage(providerId: string): Promise<string | null> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const secretStorage = (this.app as any).secretStorage;
+		const secretStorage = this.app.secretStorage;
 		if (!secretStorage) return null;
 		const key = `llm-assistant-${providerId}`;
 		const value = await secretStorage.getSecret(key);
@@ -131,8 +129,7 @@ export class SecretManager {
 	}
 
 	private async deleteFromSecretStorage(providerId: string): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const secretStorage = (this.app as any).secretStorage;
+		const secretStorage = this.app.secretStorage;
 		if (!secretStorage) return;
 		const key = `llm-assistant-${providerId}`;
 		await secretStorage.deleteSecret(key);
