@@ -1,4 +1,4 @@
-import { App, TFile, TFolder, TAbstractFile, WorkspaceLeaf } from "obsidian";
+import { App, MarkdownView, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 
 export interface FileContent {
 	path: string;
@@ -161,10 +161,11 @@ export class VaultReader {
 			leaves.push(leaf);
 		});
 		for (const leaf of leaves) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const file = (leaf.view as any)?.file;
-			if (file instanceof TFile && file.extension === "md") {
-				return file;
+			if (leaf.view instanceof MarkdownView) {
+				const file = leaf.view.file;
+				if (file instanceof TFile && file.extension === "md") {
+					return file;
+				}
 			}
 		}
 		return null;

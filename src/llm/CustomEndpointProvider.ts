@@ -1,3 +1,4 @@
+import { requestUrl } from "obsidian";
 import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo } from "./LLMProvider";
 
 /**
@@ -85,7 +86,7 @@ export class CustomEndpointProvider implements LLMProvider {
 		return response;
 	}
 
-	async chatComplete(params: ChatRequest, apiKey: string): Promise<ChatResponse> {
+	chatComplete(_params: ChatRequest, _apiKey: string): Promise<ChatResponse> {
 		throw new Error("Use sendRequest() from streaming.ts instead of calling chatComplete directly");
 	}
 
@@ -101,8 +102,13 @@ export class CustomEndpointProvider implements LLMProvider {
 				headers.Authorization = `Bearer ${apiKey}`;
 			}
 
-			const response = await fetch(modelsUrl, { method: "GET", headers });
-			return response.ok;
+			const response = await requestUrl({
+				url: modelsUrl,
+				method: "GET",
+				headers,
+				throw: false,
+			});
+			return response.status === 200;
 		} catch {
 			return false;
 		}

@@ -1095,3 +1095,28 @@
 	font-size: 13px;
 	margin-bottom: 12px;
 }
+
+/* --- 設定画面: インラインスタイル代替クラス --- */
+
+.llm-settings-input-full {
+	width: 100%;
+}
+
+.llm-settings-textarea-system {
+	width: 100%;
+	min-height: 80px;
+	font-size: 14px;
+}
+
+.llm-settings-version {
+	text-align: center;
+	color: var(--text-muted);
+	margin-top: 2em;
+	padding-bottom: 1em;
+}
+
+/* --- コンテキストバー非表示状態 --- */
+
+.llm-context-bar.is-hidden {
+	display: none;
+}

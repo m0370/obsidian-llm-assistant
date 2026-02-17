@@ -49,7 +49,7 @@ export default class LLMAssistantPlugin extends Plugin {
 
 		// リボンアイコン
 		this.addRibbonIcon("message-square", DISPLAY_NAME, () => {
-			this.activateChatView();
+			void this.activateChatView();
 		});
 
 		// コマンドパレット
@@ -57,7 +57,7 @@ export default class LLMAssistantPlugin extends Plugin {
 			id: "open-chat-view",
 			name: t("command.openChat"),
 			callback: () => {
-				this.activateChatView();
+				void this.activateChatView();
 			},
 		});
 
@@ -69,7 +69,7 @@ export default class LLMAssistantPlugin extends Plugin {
 			await this.initializeRAG();
 			// 起動後にバックグラウンドでインデックス自動構築（UIをブロックしない）
 			if (this.ragManager) {
-				setTimeout(async () => {
+				setTimeout(() => { void (async () => {
 					if (!this.ragManager || this.ragManager.isBuilt()) return;
 
 					// まずキャッシュからの復元を試行（変更ファイルのみ差分更新）
@@ -90,7 +90,7 @@ export default class LLMAssistantPlugin extends Plugin {
 						}
 					}
 					// deltaCount === 0: 変更なし → Noticeなし（サイレント復元）
-				}, 2000); // 起動2秒後に開始
+				})().catch((e) => console.warn("RAG auto-build failed:", e)); }, 2000); // 起動2秒後に開始
 			}
 		}
 
@@ -103,7 +103,7 @@ export default class LLMAssistantPlugin extends Plugin {
 				this.settings.ragEmbeddingCompactMode,
 			);
 			// VectorStoreをバックグラウンドで復元
-			this.ragManager.loadVectorStore();
+			void this.ragManager.loadVectorStore();
 		}
 
 		// RAGインデックス構築コマンド
@@ -214,16 +214,16 @@ export default class LLMAssistantPlugin extends Plugin {
 		);
 	}
 
-	async onunload(): Promise<void> {
+	onunload(): void {
 		// RAGManagerのクリーンアップ（VectorStore永続化含む）
 		if (this.ragManager) {
-			await this.ragManager.destroy();
+			void this.ragManager.destroy().catch((e) =>
+				console.warn("RAG destroy failed:", e)
+			);
 			this.ragManager = null;
 		}
 		// マスターパスワードをクリア
 		this.secretManager.clearMasterPassword();
-		// ChatViewの全インスタンスをデタッチ
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CHAT);
 	}
 
 	async activateChatView(): Promise<void> {
@@ -231,7 +231,7 @@ export default class LLMAssistantPlugin extends Plugin {
 
 		const existing = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 		if (existing.length > 0) {
-			workspace.revealLeaf(existing[0]);
+			void workspace.revealLeaf(existing[0]);
 			return;
 		}
 
@@ -241,7 +241,7 @@ export default class LLMAssistantPlugin extends Plugin {
 				type: VIEW_TYPE_CHAT,
 				active: true,
 			});
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 

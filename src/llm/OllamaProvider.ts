@@ -68,7 +68,7 @@ export class OllamaProvider implements LLMProvider {
 		return response;
 	}
 
-	async chatComplete(params: ChatRequest, apiKey: string): Promise<ChatResponse> {
+	chatComplete(_params: ChatRequest, _apiKey: string): Promise<ChatResponse> {
 		throw new Error("Use sendRequest() from streaming.ts instead of calling chatComplete directly");
 	}
 

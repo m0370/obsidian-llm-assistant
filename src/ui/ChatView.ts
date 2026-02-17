@@ -1,4 +1,5 @@
-import { ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, MarkdownRenderer, MarkdownView, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import "../obsidian.d";
 import { VIEW_TYPE_CHAT, DISPLAY_NAME } from "../constants";
 import type LLMAssistantPlugin from "../main";
 import type { LLMProvider, Message, ToolDefinition, ToolResult } from "../llm/LLMProvider";
@@ -113,13 +114,14 @@ export class ChatView extends ItemView {
 
 		// 内部リンク（[[wikilink]]）のクリックハンドラ
 		this.chatOutput.addEventListener("click", (event) => {
-			const target = event.target as HTMLElement;
-			const link = target.closest("a.internal-link") as HTMLAnchorElement | null;
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			const link = target.closest("a.internal-link");
 			if (link) {
 				event.preventDefault();
 				const href = link.getAttribute("data-href") || link.textContent;
 				if (href) {
-					this.app.workspace.openLinkText(href, "", false);
+					void this.app.workspace.openLinkText(href, "", false);
 				}
 			}
 		});
@@ -128,13 +130,12 @@ export class ChatView extends ItemView {
 		const bottomArea = container.createDiv({ cls: "llm-bottom-area" });
 
 		// コンテキストバー（添付ノート表示）
-		this.contextBar = bottomArea.createDiv({ cls: "llm-context-bar" });
-		this.contextBar.style.display = "none";
+		this.contextBar = bottomArea.createDiv({ cls: "llm-context-bar is-hidden" });
 
 		// 入力エリア（textarea + Sendボタンが1行に統合）
 		const inputContainer = bottomArea.createDiv({ cls: "llm-chat-input-container" });
 		this.chatInput = new ChatInput(inputContainer, (text: string) => {
-			this.handleSend(text);
+			void this.handleSend(text);
 		});
 
 		// フォーカスベースのキーボード対応（モバイル）
@@ -157,7 +158,7 @@ export class ChatView extends ItemView {
 			const [providerId, modelId] = this.modelSelector.value.split("::");
 			this.plugin.settings.activeProvider = providerId;
 			this.plugin.settings.activeModel = modelId;
-			this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 		});
 
 		// 右側: 新規チャット + ⊕メニュー
@@ -168,10 +169,11 @@ export class ChatView extends ItemView {
 			attr: { "aria-label": t("header.newChat") },
 		});
 		setIcon(newChatBtn, "refresh-cw");
-		newChatBtn.addEventListener("click", async () => {
-			try { await this.saveCurrentConversation(); } catch { /* ignore */ }
-			this.clearChat();
-			this.chatInput.focus();
+		newChatBtn.addEventListener("click", () => {
+			void this.saveCurrentConversation().catch(() => { /* ignore */ }).then(() => {
+				this.clearChat();
+				this.chatInput.focus();
+			});
 		});
 
 		// ⊕ 多機能メニューボタン
@@ -214,19 +216,20 @@ export class ChatView extends ItemView {
 		menu.addItem((item) => {
 			item.setTitle(t("toolbar.attachActive"))
 				.setIcon("paperclip")
-				.onClick(async () => {
+				.onClick(() => {
 					const activeFile = this.plugin.vaultReader.getActiveFile();
 					if (!activeFile) {
 						new Notice(t("notice.noActiveNote"));
 						return;
 					}
-					const entry = await this.noteContext.addFile(activeFile);
-					if (entry) {
-						this.updateContextBar();
-						new Notice(t("notice.attached", { name: activeFile.basename }));
-					} else {
-						new Notice(t("notice.alreadyAttachedOrLimit"));
-					}
+					void this.noteContext.addFile(activeFile).then((entry) => {
+						if (entry) {
+							this.updateContextBar();
+							new Notice(t("notice.attached", { name: activeFile.basename }));
+						} else {
+							new Notice(t("notice.alreadyAttachedOrLimit"));
+						}
+					});
 				});
 		});
 
@@ -235,14 +238,15 @@ export class ChatView extends ItemView {
 			item.setTitle(t("toolbar.pickFile"))
 				.setIcon("folder")
 				.onClick(() => {
-					new FilePickerModal(this.app, async (file) => {
-						const entry = await this.noteContext.addFile(file);
-						if (entry) {
-							this.updateContextBar();
-							new Notice(t("notice.attached", { name: file.basename }));
-						} else {
-							new Notice(t("notice.alreadyAttachedOrLimit"));
-						}
+					new FilePickerModal(this.app, (file) => {
+						void this.noteContext.addFile(file).then((entry) => {
+							if (entry) {
+								this.updateContextBar();
+								new Notice(t("notice.attached", { name: file.basename }));
+							} else {
+								new Notice(t("notice.alreadyAttachedOrLimit"));
+							}
+						});
 					}).open();
 				});
 		});
@@ -258,7 +262,7 @@ export class ChatView extends ItemView {
 						.reverse()
 						.find((m) => m.role === "assistant");
 					if (lastAssistant) {
-						navigator.clipboard.writeText(lastAssistant.content);
+						void navigator.clipboard.writeText(lastAssistant.content);
 						new Notice(t("notice.copied"));
 					}
 				});
@@ -295,8 +299,7 @@ export class ChatView extends ItemView {
 			item.setTitle(t("header.settings"))
 				.setIcon("settings")
 				.onClick(() => {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const setting = (this.app as any).setting;
+					const setting = this.app.setting;
 					if (setting) {
 						setting.open();
 						setting.openTabById("llm-assistant");
@@ -312,11 +315,11 @@ export class ChatView extends ItemView {
 		const entries = this.noteContext.getEntries();
 
 		if (entries.length === 0) {
-			this.contextBar.style.display = "none";
+			this.contextBar.addClass("is-hidden");
 			return;
 		}
 
-		this.contextBar.style.display = "flex";
+		this.contextBar.removeClass("is-hidden");
 
 		for (const entry of entries) {
 			const tag = this.contextBar.createDiv({ cls: "llm-context-tag" });
@@ -358,11 +361,10 @@ export class ChatView extends ItemView {
 		}
 
 		// エディタのカーソル位置に挿入
-		const activeLeaf = this.app.workspace.activeLeaf;
-		if (!activeLeaf) return;
+		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!markdownView) return;
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const editor = (activeLeaf.view as any).editor;
+		const editor = markdownView.editor;
 		if (editor) {
 			const cursor = editor.getCursor();
 			editor.replaceRange(lastAssistant.content, cursor);
@@ -375,7 +377,7 @@ export class ChatView extends ItemView {
 	 */
 	sendMessage(text: string): void {
 		this.chatInput.setValue(text);
-		this.handleSend(text);
+		void this.handleSend(text);
 	}
 
 	private async handleSend(text: string): Promise<void> {
@@ -388,7 +390,7 @@ export class ChatView extends ItemView {
 			timestamp: Date.now(),
 		};
 		this.messages.push(userMsg);
-		this.renderMessage(userMsg, this.messages.length - 1);
+		void this.renderMessage(userMsg, this.messages.length - 1);
 
 		// LLMプロバイダーを取得
 		const provider = this.plugin.providerRegistry.get(
@@ -546,8 +548,9 @@ export class ChatView extends ItemView {
 			activeFile = this.plugin.vaultReader.getMostRecentLeafFile(this.app);
 		}
 		if (activeFile) {
+			const currentFile = activeFile;
 			const alreadyAttached = this.noteContext.getEntries().some(
-				e => e.file.path === activeFile!.path
+				e => e.file.path === currentFile.path
 			);
 			if (!alreadyAttached) {
 				const content = await this.plugin.vaultReader.cachedReadFile(activeFile);
@@ -917,16 +920,20 @@ export class ChatView extends ItemView {
 				hunkCtrls.push(ctrl);
 			}
 
-			applyAllBtn.addEventListener("click", async () => {
-				for (const c of hunkCtrls) {
-					if (!c.hunk.applied) await c.apply();
-				}
+			applyAllBtn.addEventListener("click", () => {
+				void (async () => {
+					for (const c of hunkCtrls) {
+						if (!c.hunk.applied) await c.apply();
+					}
+				})();
 			});
 
-			revertAllBtn.addEventListener("click", async () => {
-				for (const c of [...hunkCtrls].reverse()) {
-					if (c.hunk.applied) await c.undo();
-				}
+			revertAllBtn.addEventListener("click", () => {
+				void (async () => {
+					for (const c of [...hunkCtrls].reverse()) {
+						if (c.hunk.applied) await c.undo();
+					}
+				})();
 			});
 		} else {
 			this.renderHunk(container, op.path, hunks[0], 1, 1);
@@ -951,30 +958,30 @@ export class ChatView extends ItemView {
 		setIcon(dismissBtn, "x");
 		dismissBtn.createSpan({ text: ` ${t("edit.dismiss")}` });
 
-		let created = false;
+		applyBtn.addEventListener("click", () => {
+			void (async () => {
+				await this.plugin.vaultReader.createNote(op.path, op.content);
+				new Notice(t("notice.fileCreated", { name: op.path }));
+				container.addClass("llm-edit-applied");
+				applyBtn.setAttribute("disabled", "true");
 
-		applyBtn.addEventListener("click", async () => {
-			await this.plugin.vaultReader.createNote(op.path, op.content);
-			new Notice(t("notice.fileCreated", { name: op.path }));
-			created = true;
-			container.addClass("llm-edit-applied");
-			applyBtn.setAttribute("disabled", "true");
-
-			// Undoボタンを表示
-			const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
-			setIcon(undoBtn, "undo");
-			undoBtn.createSpan({ text: ` ${t("edit.undo")}` });
-			undoBtn.addEventListener("click", async () => {
-				const f = this.plugin.vaultReader.getFileByPath(op.path);
-				if (f) {
-					await this.app.vault.delete(f);
-					new Notice(t("notice.fileReverted", { name: op.path }));
-				}
-				created = false;
-				container.removeClass("llm-edit-applied");
-				applyBtn.removeAttribute("disabled");
-				undoBtn.remove();
-			});
+				// Undoボタンを表示
+				const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
+				setIcon(undoBtn, "undo");
+				undoBtn.createSpan({ text: ` ${t("edit.undo")}` });
+				undoBtn.addEventListener("click", () => {
+					void (async () => {
+						const f = this.plugin.vaultReader.getFileByPath(op.path);
+						if (f) {
+							await this.app.fileManager.trashFile(f);
+							new Notice(t("notice.fileReverted", { name: op.path }));
+						}
+						container.removeClass("llm-edit-applied");
+						applyBtn.removeAttribute("disabled");
+						undoBtn.remove();
+					})();
+				});
+			})();
 		});
 
 		dismissBtn.addEventListener("click", () => {
@@ -1051,7 +1058,7 @@ export class ChatView extends ItemView {
 				undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
 				setIcon(undoBtn, "undo");
 				undoBtn.createSpan({ text: ` ${t("edit.undo")}` });
-				undoBtn.addEventListener("click", () => doUndo());
+				undoBtn.addEventListener("click", () => void doUndo());
 			} else {
 				undoBtn.removeAttribute("disabled");
 			}
@@ -1076,7 +1083,7 @@ export class ChatView extends ItemView {
 			new Notice(t("notice.fileReverted", { name: filePath }));
 		};
 
-		applyBtn.addEventListener("click", () => doApply());
+		applyBtn.addEventListener("click", () => void doApply());
 
 		dismissBtn.addEventListener("click", () => {
 			hunkEl.addClass("llm-edit-dismissed");
@@ -1280,7 +1287,7 @@ export class ChatView extends ItemView {
 		// DOM上のメッセージを再レンダリング
 		this.chatOutput.empty();
 		for (let i = 0; i < this.messages.length; i++) {
-			this.renderMessage(this.messages[i], i);
+			void this.renderMessage(this.messages[i], i);
 		}
 
 		// 入力欄にメッセージ内容をセット

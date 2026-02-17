@@ -19,8 +19,6 @@ import type { EmbeddingProvider, EmbeddingProviderRegistry } from "./EmbeddingPr
 import { VectorStore } from "./VectorStore";
 import { HybridSearchEngine } from "./HybridSearchEngine";
 
-const INDEX_CACHE_PATH = ".obsidian/plugins/llm-assistant/cache/rag-index.json";
-
 interface IndexCacheEntry {
 	hash: string;
 	chunks: Array<{
@@ -78,6 +76,14 @@ export class RAGManager {
 
 	// Vaultイベント用デバウンス
 	private updateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+	// 動的パス（app.vault.configDir ベース）
+	private get indexCachePath(): string {
+		return `${this.app.vault.configDir}/plugins/llm-assistant/cache/rag-index.json`;
+	}
+	private get cacheDirPath(): string {
+		return `${this.app.vault.configDir}/plugins/llm-assistant/cache`;
+	}
 
 	constructor(
 		app: App,
@@ -689,7 +695,7 @@ export class RAGManager {
 			filePath,
 			setTimeout(() => {
 				this.updateTimers.delete(filePath);
-				this.updateFileIndex(filePath);
+				void this.updateFileIndex(filePath);
 			}, 500),
 		);
 	}
@@ -811,14 +817,13 @@ export class RAGManager {
 		}
 
 		// cacheディレクトリの確保
-		const cacheDir = ".obsidian/plugins/llm-assistant/cache";
 		try {
-			if (!(await this.app.vault.adapter.exists(cacheDir))) {
-				await this.app.vault.adapter.mkdir(cacheDir);
+			if (!(await this.app.vault.adapter.exists(this.cacheDirPath))) {
+				await this.app.vault.adapter.mkdir(this.cacheDirPath);
 			}
 		} catch { /* already exists */ }
 
-		await this.app.vault.adapter.write(INDEX_CACHE_PATH, JSON.stringify(cache));
+		await this.app.vault.adapter.write(this.indexCachePath, JSON.stringify(cache));
 	}
 
 	/**
@@ -826,10 +831,10 @@ export class RAGManager {
 	 */
 	private async loadIndexCache(): Promise<IndexCache | null> {
 		try {
-			if (!(await this.app.vault.adapter.exists(INDEX_CACHE_PATH))) {
+			if (!(await this.app.vault.adapter.exists(this.indexCachePath))) {
 				return null;
 			}
-			const raw = await this.app.vault.adapter.read(INDEX_CACHE_PATH);
+			const raw = await this.app.vault.adapter.read(this.indexCachePath);
 			const cache: IndexCache = JSON.parse(raw);
 			if (cache.version !== 1) return null;
 			return cache;

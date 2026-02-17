@@ -47,12 +47,13 @@ export class ConversationListModal extends Modal {
 			meta.textContent = `${entry.provider} / ${entry.model} | ${t("conversation.messages", { count: entry.messageCount })} | ${this.formatDate(entry.updatedAt)}`;
 
 			// クリックで会話を読み込み
-			info.addEventListener("click", async () => {
-				const conversation = await this.manager.load(entry.id);
-				if (conversation) {
-					this.onSelect(conversation);
-					this.close();
-				}
+			info.addEventListener("click", () => {
+				void this.manager.load(entry.id).then((conversation) => {
+					if (conversation) {
+						this.onSelect(conversation);
+						this.close();
+					}
+				});
 			});
 
 			// 削除ボタン
@@ -61,11 +62,12 @@ export class ConversationListModal extends Modal {
 				text: "\u00D7",
 				attr: { "aria-label": t("conversation.delete") },
 			});
-			deleteBtn.addEventListener("click", async (e) => {
+			deleteBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
-				await this.manager.delete(entry.id);
-				new Notice(t("notice.conversationDeleted"));
-				this.onOpen(); // リスト更新
+				void this.manager.delete(entry.id).then(() => {
+					new Notice(t("notice.conversationDeleted"));
+					void this.onOpen(); // リスト更新
+				});
 			});
 		}
 	}
