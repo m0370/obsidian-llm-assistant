@@ -95,7 +95,7 @@ export class ChatView extends ItemView {
 		return "message-square";
 	}
 
-	async onOpen(): Promise<void> {
+	onOpen(): Promise<void> {
 		const container = this.contentEl;
 		container.empty();
 		container.addClass("llm-assistant-view");
@@ -140,13 +140,17 @@ export class ChatView extends ItemView {
 
 		// フォーカスベースのキーボード対応（モバイル）
 		this.viewportCleanup = setupMobileViewportHandler(container);
+
+		return Promise.resolve();
 	}
 
-	async onClose(): Promise<void> {
+	onClose(): Promise<void> {
 		this.viewportCleanup?.destroy();
 		this.viewportCleanup = null;
 		this.chatInput?.destroy();
 		this.contentEl.empty();
+
+		return Promise.resolve();
 	}
 
 	private buildHeader(): void {
