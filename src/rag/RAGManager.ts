@@ -278,7 +278,7 @@ export class RAGManager {
 		const resetIdle = () => {
 			if (this.idleTimer) clearTimeout(this.idleTimer);
 			this.idleTimer = setTimeout(() => {
-				this.runAutoEmbedBatch(apiKey);
+				void this.runAutoEmbedBatch(apiKey);
 			}, IDLE_TIMEOUT);
 		};
 
@@ -346,9 +346,9 @@ export class RAGManager {
 				);
 				for (let j = 0; j < batch.length; j++) {
 					const vec = new Float32Array(result.embeddings[j]);
-					this.vectorStore!.set(batch[j].id, vec);
+					this.vectorStore.set(batch[j].id, vec);
 				}
-				this.vectorStore!.addTokensUsed(result.totalTokens);
+				this.vectorStore.addTokensUsed(result.totalTokens);
 			} catch (e) {
 				console.warn("Auto-embed batch failed:", e);
 				return;

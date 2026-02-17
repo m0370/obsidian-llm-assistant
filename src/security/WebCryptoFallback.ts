@@ -69,8 +69,8 @@ export async function encryptApiKey(
 
 	return {
 		encrypted: arrayBufferToBase64(encrypted),
-		iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
-		salt: arrayBufferToBase64(salt.buffer as ArrayBuffer),
+		iv: arrayBufferToBase64(iv.buffer),
+		salt: arrayBufferToBase64(salt.buffer),
 	};
 }
 
