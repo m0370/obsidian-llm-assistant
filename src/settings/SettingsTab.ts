@@ -211,7 +211,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			.setDesc(t("settings.endpointUrlDesc"))
 			.addText((text) => {
 				text.inputEl.addClass("llm-settings-input-full");
-				text.setPlaceholder("http://localhost:8080/v1/chat/completions");
+				text.setPlaceholder(t("settings.endpointUrlPlaceholder"));
 				text.setValue(this.plugin.settings.customEndpoint);
 				text.onChange(async (value) => {
 					this.plugin.settings.customEndpoint = value;
@@ -224,7 +224,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			.setName(t("settings.modelId"))
 			.setDesc(t("settings.modelIdDesc"))
 			.addText((text) => {
-				text.setPlaceholder("model-name");
+				text.setPlaceholder(t("settings.modelIdPlaceholder"));
 				text.setValue(this.plugin.settings.customModelId);
 				text.onChange(async (value) => {
 					this.plugin.settings.customModelId = value;
@@ -408,7 +408,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				.setDesc(t("settings.ragExcludeFoldersDesc"))
 				.addText((text) => {
 					text.inputEl.addClass("llm-settings-input-full");
-					text.setPlaceholder("Private, Work/Confidential");
+					text.setPlaceholder(t("settings.ragExcludeFoldersPlaceholder"));
 					text.setValue(this.plugin.settings.ragExcludeFolders);
 					text.onChange(async (value) => {
 						this.plugin.settings.ragExcludeFolders = value;
