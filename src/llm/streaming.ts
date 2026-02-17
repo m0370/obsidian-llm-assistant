@@ -80,6 +80,7 @@ async function streamWithFetch(
 	const headers = provider.buildHeaders(apiKey);
 	const url = getEndpointUrl(provider, params, apiKey, true);
 
+	// /skip -- fetch() is required for SSE streaming; requestUrl() does not support streaming response body
 	const response = await fetch(url, {
 		method: "POST",
 		headers: { ...headers, "Content-Type": "application/json" },

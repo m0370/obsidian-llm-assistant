@@ -24,15 +24,19 @@ interface ConversationIndex {
 	}>;
 }
 
-const CONVERSATIONS_FOLDER = ".obsidian/plugins/llm-assistant/conversations";
-const INDEX_FILE = `${CONVERSATIONS_FOLDER}/index.json`;
-
 /**
  * 会話履歴の保存・読み込み・削除を管理
- * vault.adapter経由でJSONファイルとして保存（.obsidianフォルダ内にアクセスするため）
+ * vault.adapter経由でJSONファイルとして保存（設定フォルダ内にアクセスするため）
  */
 export class ConversationManager {
 	private app: App;
+
+	private get conversationsFolder(): string {
+		return `${this.app.vault.configDir}/plugins/llm-assistant/conversations`;
+	}
+	private get indexFile(): string {
+		return `${this.conversationsFolder}/index.json`;
+	}
 
 	constructor(app: App) {
 		this.app = app;
@@ -43,7 +47,7 @@ export class ConversationManager {
 	 */
 	async save(conversation: Conversation): Promise<void> {
 		await this.ensureFolder();
-		const filePath = `${CONVERSATIONS_FOLDER}/${conversation.id}.json`;
+		const filePath = `${this.conversationsFolder}/${conversation.id}.json`;
 		const content = JSON.stringify(conversation, null, 2);
 		await this.app.vault.adapter.write(filePath, content);
 		await this.updateIndex(conversation);
@@ -53,7 +57,7 @@ export class ConversationManager {
 	 * 会話を読み込み
 	 */
 	async load(id: string): Promise<Conversation | null> {
-		const filePath = `${CONVERSATIONS_FOLDER}/${id}.json`;
+		const filePath = `${this.conversationsFolder}/${id}.json`;
 		try {
 			const exists = await this.app.vault.adapter.exists(filePath);
 			if (!exists) return null;
@@ -68,7 +72,7 @@ export class ConversationManager {
 	 * 会話を削除
 	 */
 	async delete(id: string): Promise<void> {
-		const filePath = `${CONVERSATIONS_FOLDER}/${id}.json`;
+		const filePath = `${this.conversationsFolder}/${id}.json`;
 		try {
 			const exists = await this.app.vault.adapter.exists(filePath);
 			if (exists) {
@@ -108,17 +112,17 @@ export class ConversationManager {
 	// --- 内部メソッド ---
 
 	private async ensureFolder(): Promise<void> {
-		const exists = await this.app.vault.adapter.exists(CONVERSATIONS_FOLDER);
+		const exists = await this.app.vault.adapter.exists(this.conversationsFolder);
 		if (!exists) {
-			await this.app.vault.adapter.mkdir(CONVERSATIONS_FOLDER);
+			await this.app.vault.adapter.mkdir(this.conversationsFolder);
 		}
 	}
 
 	private async loadIndex(): Promise<ConversationIndex> {
 		try {
-			const exists = await this.app.vault.adapter.exists(INDEX_FILE);
+			const exists = await this.app.vault.adapter.exists(this.indexFile);
 			if (!exists) return { conversations: [] };
-			const content = await this.app.vault.adapter.read(INDEX_FILE);
+			const content = await this.app.vault.adapter.read(this.indexFile);
 			return JSON.parse(content) as ConversationIndex;
 		} catch {
 			return { conversations: [] };
@@ -128,7 +132,7 @@ export class ConversationManager {
 	private async saveIndex(index: ConversationIndex): Promise<void> {
 		await this.ensureFolder();
 		const content = JSON.stringify(index, null, 2);
-		await this.app.vault.adapter.write(INDEX_FILE, content);
+		await this.app.vault.adapter.write(this.indexFile, content);
 	}
 
 	private async updateIndex(conversation: Conversation): Promise<void> {

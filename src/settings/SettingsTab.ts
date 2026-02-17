@@ -5,7 +5,6 @@ import type { SecurityLevel } from "../security/SecretManager";
 import type { CustomEndpointProvider } from "../llm/CustomEndpointProvider";
 import type { LLMProvider } from "../llm/LLMProvider";
 import { t, setLocale, resolveLocale } from "../i18n";
-import { estimateTokens } from "../utils/TokenCounter";
 import { isMobile } from "../utils/platform";
 
 export class LLMAssistantSettingTab extends PluginSettingTab {
@@ -20,7 +19,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: t("settings.heading") });
+		new Setting(containerEl).setName(t("settings.heading")).setHeading();
 
 		// 言語選択（最上部）
 		new Setting(containerEl)
@@ -97,7 +96,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		}
 
 		// セキュリティレベル選択
-		containerEl.createEl("h3", { text: t("settings.security") });
+		new Setting(containerEl).setName(t("settings.security")).setHeading();
 
 		const secDesc = this.plugin.secretManager.isSecretStorageAvailable()
 			? t("settings.securityAvailable")
@@ -135,7 +134,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		}
 
 		// API鍵設定セクション（SecretManager経由）
-		containerEl.createEl("h3", { text: t("settings.apiKeys") });
+		new Setting(containerEl).setName(t("settings.apiKeys")).setHeading();
 
 		allProviders.filter((p) => p.requiresApiKey).forEach((provider) => {
 			const desc = provider.apiKeyUrl
@@ -151,9 +150,9 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				text.setPlaceholder(`${provider.name} API Key`);
 
 				// 現在のAPI鍵を読み込み
-				this.plugin.secretManager.getApiKey(provider.id).then((key) => {
+				void this.plugin.secretManager.getApiKey(provider.id).then((key) => {
 					if (key) text.setValue(key);
-				});
+				}).catch(() => { /* ignore */ });
 
 				text.onChange(async (value) => {
 					if (value) {
@@ -205,13 +204,13 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		});
 
 		// カスタムエンドポイント設定
-		containerEl.createEl("h3", { text: t("settings.customEndpoint") });
+		new Setting(containerEl).setName(t("settings.customEndpoint")).setHeading();
 
 		new Setting(containerEl)
 			.setName(t("settings.endpointUrl"))
 			.setDesc(t("settings.endpointUrlDesc"))
 			.addText((text) => {
-				text.inputEl.style.width = "100%";
+				text.inputEl.addClass("llm-settings-input-full");
 				text.setPlaceholder("http://localhost:8080/v1/chat/completions");
 				text.setValue(this.plugin.settings.customEndpoint);
 				text.onChange(async (value) => {
@@ -235,7 +234,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			});
 
 		// 表示設定
-		containerEl.createEl("h3", { text: t("settings.advanced") });
+		new Setting(containerEl).setName(t("settings.advanced")).setHeading();
 
 		new Setting(containerEl)
 			.setName(t("settings.fontSize"))
@@ -251,8 +250,10 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					// ChatViewのフォントサイズを即時更新
 					const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 					for (const leaf of leaves) {
-						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						(leaf.view as any).updateFontSize?.();
+						const view = leaf.view;
+						if ("updateFontSize" in view && typeof view.updateFontSize === "function") {
+							(view.updateFontSize as () => void)();
+						}
 					}
 				});
 			});
@@ -306,9 +307,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			.setName(t("settings.systemPrompt"))
 			.setDesc(t("settings.systemPromptDesc"))
 			.addTextArea((text) => {
-				text.inputEl.style.width = "100%";
-				text.inputEl.style.minHeight = "80px";
-				text.inputEl.style.fontSize = "14px";
+				text.inputEl.addClass("llm-settings-textarea-system");
 				text.setPlaceholder(t("settings.systemPromptPlaceholder"));
 				text.setValue(this.plugin.settings.systemPrompt);
 				text.onChange(async (value) => {
@@ -327,7 +326,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		});
 
 		// RAG設定
-		advancedDetailsEl.createEl("h3", { text: t("settings.rag") });
+		new Setting(advancedDetailsEl).setName(t("settings.rag")).setHeading();
 
 		new Setting(advancedDetailsEl)
 			.setName(t("settings.ragEnabled"))
@@ -340,7 +339,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					if (value) {
 						await this.plugin.initializeRAG();
 					} else {
-						this.plugin.destroyRAG();
+						void this.plugin.destroyRAG();
 					}
 					this.display();
 				});
@@ -408,7 +407,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				.setName(t("settings.ragExcludeFolders"))
 				.setDesc(t("settings.ragExcludeFoldersDesc"))
 				.addText((text) => {
-					text.inputEl.style.width = "100%";
+					text.inputEl.addClass("llm-settings-input-full");
 					text.setPlaceholder("Private, Work/Confidential");
 					text.setValue(this.plugin.settings.ragExcludeFolders);
 					text.onChange(async (value) => {
@@ -454,7 +453,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			}
 
 			// --- Embedding検索セクション ---
-			advancedDetailsEl.createEl("h4", { text: t("settings.ragEmbedding") });
+			new Setting(advancedDetailsEl).setName(t("settings.ragEmbedding")).setHeading();
 
 			new Setting(advancedDetailsEl)
 				.setName(t("settings.ragEmbeddingEnabled"))
@@ -555,9 +554,9 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 						keySetting.addText((text) => {
 							text.inputEl.type = "password";
 							text.setPlaceholder(`${selectedProvider.name} API Key`);
-							this.plugin.secretManager.getApiKey(keyId).then((key) => {
+							void this.plugin.secretManager.getApiKey(keyId).then((key) => {
 								if (key) text.setValue(key);
-							});
+							}).catch(() => { /* ignore */ });
 							text.onChange(async (value) => {
 								if (value) {
 									try {
@@ -688,10 +687,6 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		versionEl.createEl("small", {
 			text: `${DISPLAY_NAME} v${this.plugin.manifest.version}`,
 		});
-		versionEl.style.textAlign = "center";
-		versionEl.style.color = "var(--text-muted)";
-		versionEl.style.marginTop = "2em";
-		versionEl.style.paddingBottom = "1em";
 	}
 
 	private async refreshModels(provider: LLMProvider, btn: { setButtonText(text: string): void; setDisabled(disabled: boolean): void }): Promise<void> {
