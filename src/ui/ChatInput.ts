@@ -60,12 +60,14 @@ export class ChatInput {
 
 	private autoExpand(): void {
 		const textarea = this.textareaEl;
-		textarea.style.height = "auto";
+		textarea.setCssStyles({ height: "auto" });
 		const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
 		const maxHeight = viewportHeight * 0.25;
 		const scrollHeight = textarea.scrollHeight;
-		textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-		textarea.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden";
+		textarea.setCssStyles({
+			height: `${Math.min(scrollHeight, maxHeight)}px`,
+			overflowY: scrollHeight > maxHeight ? "auto" : "hidden",
+		});
 	}
 
 	private send(): void {
@@ -73,7 +75,7 @@ export class ChatInput {
 		if (!text) return;
 		this.onSend(text);
 		this.textareaEl.value = "";
-		this.textareaEl.style.height = "auto";
+		this.textareaEl.setCssStyles({ height: "auto" });
 		this.textareaEl.focus();
 	}
 
