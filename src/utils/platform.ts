@@ -23,6 +23,10 @@ export function getDeviceType(): "desktop" | "tablet" | "phone" {
 	return "phone";
 }
 
+export function hasCapacitorKeyboard(): boolean {
+	return !!(window.Capacitor?.Plugins?.Keyboard?.addListener);
+}
+
 export function canUseFetchStreaming(supportsCORS: boolean): boolean {
 	if (!supportsCORS) return false;
 	// モバイルでもCORS対応プロバイダーならfetch()を試行可能

@@ -31,6 +31,13 @@ export class ChatMessage {
 		const labelEl = headerEl.createDiv({ cls: "llm-message-label" });
 		labelEl.textContent = this.data.role === "user" ? t("message.user") : t("message.assistant");
 
+		// タイムスタンプ（ホバー/タップで表示）
+		if (this.data.timestamp) {
+			const date = new Date(this.data.timestamp);
+			const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+			headerEl.createSpan({ cls: "llm-message-timestamp", text: timeStr });
+		}
+
 		// ユーザーメッセージにのみ編集ボタンを追加
 		if (this.data.role === "user" && onEdit) {
 			const editBtn = headerEl.createEl("button", {

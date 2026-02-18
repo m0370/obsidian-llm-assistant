@@ -33,5 +33,19 @@ declare global {
 		moment?: {
 			locale?: () => string;
 		};
+		Capacitor?: {
+			Plugins?: {
+				Keyboard?: {
+					addListener(
+						event: "keyboardWillShow" | "keyboardDidShow",
+						callback: (info: { keyboardHeight: number }) => void
+					): Promise<{ remove: () => void }>;
+					addListener(
+						event: "keyboardWillHide" | "keyboardDidHide",
+						callback: () => void
+					): Promise<{ remove: () => void }>;
+				};
+			};
+		};
 	}
 }

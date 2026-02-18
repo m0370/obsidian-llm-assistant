@@ -77,6 +77,9 @@ export class ChatView extends ItemView {
 	private messages: MessageData[] = [];
 	private isGenerating = false;
 	private viewportCleanup: { destroy: () => void } | null = null;
+	private scrollToBottomBtn: HTMLElement | null = null;
+	private abortController: AbortController | null = null;
+	private regenerateBtn: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -111,6 +114,18 @@ export class ChatView extends ItemView {
 
 		// チャット出力エリア
 		this.chatOutput = container.createDiv({ cls: "llm-chat-output" });
+
+		// 「最新へ」スクロールボタン
+		this.scrollToBottomBtn = container.createDiv({ cls: "llm-scroll-to-bottom is-hidden" });
+		setIcon(this.scrollToBottomBtn, "arrow-down");
+		this.scrollToBottomBtn.addEventListener("click", () => {
+			this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
+		});
+		this.chatOutput.addEventListener("scroll", () => {
+			const { scrollTop, scrollHeight, clientHeight } = this.chatOutput;
+			const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+			this.scrollToBottomBtn?.toggleClass("is-hidden", isNearBottom);
+		});
 
 		// 内部リンク（[[wikilink]]）のクリックハンドラ
 		this.chatOutput.addEventListener("click", (event) => {
@@ -387,6 +402,10 @@ export class ChatView extends ItemView {
 	private async handleSend(text: string): Promise<void> {
 		if (!text.trim() || this.isGenerating) return;
 
+		// 既存の再生成ボタンを削除
+		this.regenerateBtn?.remove();
+		this.regenerateBtn = null;
+
 		// ユーザーメッセージを追加
 		const userMsg: MessageData = {
 			role: "user",
@@ -420,11 +439,21 @@ export class ChatView extends ItemView {
 
 		// 生成開始
 		this.isGenerating = true;
+		this.abortController = new AbortController();
 		this.chatInput.disable();
 		this.chatInput.disableSend();
 
-		// 生成中インジケーター
+		// 生成中インジケーター + 停止ボタン
 		const generatingEl = this.showGeneratingIndicator();
+		const stopBtn = generatingEl.createEl("button", {
+			cls: "llm-stop-btn",
+			attr: { "aria-label": t("chat.stop") },
+		});
+		setIcon(stopBtn, "square");
+		stopBtn.createSpan({ text: t("chat.stop") });
+		stopBtn.addEventListener("click", () => {
+			this.abortController?.abort();
+		});
 
 		// アシスタントメッセージの枠を先に作成
 		const assistantMsg: MessageData = {
@@ -488,23 +517,34 @@ export class ChatView extends ItemView {
 				await this.renderEditProposal(contentEl, op);
 			}
 		} catch (err) {
-			let errorContent: string;
-			if (err instanceof RateLimitError) {
-				errorContent = this.buildRateLimitMessage(err.providerId);
+			// Abort（停止ボタン）の場合はエラー表示せず、途中の応答を保持
+			if (err instanceof DOMException && err.name === "AbortError") {
+				if (!assistantMsg.content.trim()) {
+					assistantMsg.content = t("chat.stopped");
+				}
+				messageComponent.updateContent(assistantMsg.content);
 			} else {
-				const errorMsg = err instanceof Error ? err.message : String(err);
-				errorContent = t("error.occurred", { message: errorMsg });
+				let errorContent: string;
+				if (err instanceof RateLimitError) {
+					errorContent = this.buildRateLimitMessage(err.providerId);
+				} else {
+					const errorMsg = err instanceof Error ? err.message : String(err);
+					errorContent = t("error.occurred", { message: errorMsg });
+				}
+				assistantMsg.content = errorContent;
+				messageComponent.updateContent(errorContent);
+				messageComponent.getMessageEl().addClass("llm-message-error");
 			}
-			assistantMsg.content = errorContent;
-			messageComponent.updateContent(errorContent);
-			messageComponent.getMessageEl().addClass("llm-message-error");
 		} finally {
 			generatingEl.remove();
 			this.isGenerating = false;
+			this.abortController = null;
 			this.chatInput.enable();
 			this.chatInput.enableSend();
 			this.chatInput.focus();
 			this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
+			// 再生成ボタンを表示
+			this.showRegenerateButton();
 			// 自動保存
 			await this.saveCurrentConversation();
 		}
@@ -624,7 +664,8 @@ export class ChatView extends ItemView {
 					const displayContent = this.getStreamingDisplayContent(assistantMsg.content);
 					messageComponent.updateContent(displayContent);
 					this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
-				}
+				},
+				this.abortController?.signal,
 			);
 
 			// 最終コンテンツを設定（常にフィルタ済みで表示）
@@ -716,7 +757,8 @@ export class ChatView extends ItemView {
 					assistantMsg.content += token;
 					messageComponent.updateContent(assistantMsg.content);
 					this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
-				}
+				},
+				this.abortController?.signal,
 			);
 
 			// テキスト部分を更新
@@ -968,6 +1010,7 @@ export class ChatView extends ItemView {
 				new Notice(t("notice.fileCreated", { name: op.path }));
 				container.addClass("llm-edit-applied");
 				applyBtn.setAttribute("disabled", "true");
+				dismissBtn.style.display = "none";
 
 				// Undoボタンを表示
 				const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
@@ -982,6 +1025,7 @@ export class ChatView extends ItemView {
 						}
 						container.removeClass("llm-edit-applied");
 						applyBtn.removeAttribute("disabled");
+						dismissBtn.style.display = "";
 						undoBtn.remove();
 					})();
 				});
@@ -1056,6 +1100,7 @@ export class ChatView extends ItemView {
 			hunk.applied = true;
 			hunkEl.addClass("llm-edit-applied");
 			applyBtn.setAttribute("disabled", "true");
+			dismissBtn.style.display = "none";
 
 			// Undoボタン表示
 			if (!undoBtn) {
@@ -1065,6 +1110,7 @@ export class ChatView extends ItemView {
 				undoBtn.addEventListener("click", () => void doUndo());
 			} else {
 				undoBtn.removeAttribute("disabled");
+				undoBtn.style.display = "";
 			}
 			new Notice(t("notice.fileEdited", { name: filePath }));
 		};
@@ -1083,7 +1129,8 @@ export class ChatView extends ItemView {
 			hunk.applied = false;
 			hunkEl.removeClass("llm-edit-applied");
 			applyBtn.removeAttribute("disabled");
-			if (undoBtn) undoBtn.setAttribute("disabled", "true");
+			dismissBtn.style.display = "";
+			if (undoBtn) undoBtn.style.display = "none";
 			new Notice(t("notice.fileReverted", { name: filePath }));
 		};
 
@@ -1223,6 +1270,31 @@ export class ChatView extends ItemView {
 		dots.createEl("span");
 		this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
 		return el;
+	}
+
+	private showRegenerateButton(): void {
+		// 最後のユーザーメッセージを探す
+		const lastUserIndex = this.messages.map(m => m.role).lastIndexOf("user");
+		if (lastUserIndex < 0) return;
+
+		this.regenerateBtn = this.chatOutput.createDiv({ cls: "llm-regenerate" });
+		const btn = this.regenerateBtn.createEl("button", { cls: "llm-regenerate-btn" });
+		setIcon(btn, "refresh-cw");
+		btn.createSpan({ text: t("chat.regenerate") });
+		btn.addEventListener("click", () => {
+			if (this.isGenerating) return;
+			const userMsg = this.messages[lastUserIndex];
+			// 最後のユーザーメッセージ以降を削除して再送信
+			this.messages = this.messages.slice(0, lastUserIndex);
+			this.regenerateBtn?.remove();
+			this.regenerateBtn = null;
+			// DOM上のメッセージを再レンダリング
+			this.chatOutput.empty();
+			for (let i = 0; i < this.messages.length; i++) {
+				void this.renderMessage(this.messages[i], i);
+			}
+			void this.handleSend(userMsg.content);
+		});
 	}
 
 	/**
