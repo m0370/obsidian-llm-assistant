@@ -56,6 +56,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					}
 					await this.plugin.saveSettings();
 					this.display();
+					this.syncChatViewModelSelector();
 				});
 			});
 
@@ -81,6 +82,7 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 					dropdown.onChange(async (value) => {
 						this.plugin.settings.activeModel = value;
 						await this.plugin.saveSettings();
+						this.syncChatViewModelSelector();
 					});
 				});
 
@@ -710,12 +712,23 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 			provider.models = models;
 			new Notice(t("notice.modelsRefreshed", { count: models.length }));
 			this.display(); // UI再描画
+			this.syncChatViewModelSelector();
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			new Notice(t("notice.modelsRefreshFailed", { message: msg }), 8000);
 		} finally {
 			btn.setButtonText(t("settings.refreshModels"));
 			btn.setDisabled(false);
+		}
+	}
+
+	private syncChatViewModelSelector(): void {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT);
+		for (const leaf of leaves) {
+			const view = leaf.view;
+			if ("updateModelSelector" in view && typeof view.updateModelSelector === "function") {
+				(view.updateModelSelector as () => void)();
+			}
 		}
 	}
 
