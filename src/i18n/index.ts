@@ -42,6 +42,13 @@ const translations: Record<Locale, Record<string, string>> = {
 		"chat.stopped": "(Generation stopped)",
 		"chat.regenerate": "Regenerate",
 
+		// Welcome
+		"welcome.title": "Welcome to LLM Assistant",
+		"welcome.tip1": "Type a question or request",
+		"welcome.tip2": "Use [[filename]] to auto-reference notes",
+		"welcome.tip3": "Ask \"Proofread this note\" for edit suggestions",
+		"welcome.tip4": "Enable RAG to search your entire vault",
+
 		// Notices
 		"notice.noActiveNote": "No active note",
 		"notice.attached": "{name} attached",
@@ -300,6 +307,13 @@ const translations: Record<Locale, Record<string, string>> = {
 		"chat.stop": "停止",
 		"chat.stopped": "（生成を停止しました）",
 		"chat.regenerate": "再生成",
+
+		// Welcome
+		"welcome.title": "LLM Assistant へようこそ",
+		"welcome.tip1": "質問やリクエストを入力してください",
+		"welcome.tip2": "[[ファイル名]] でノートの内容を自動参照",
+		"welcome.tip3": "「このノートを校正して」でファイル編集を提案",
+		"welcome.tip4": "RAGを有効にするとVault全体から関連情報を検索",
 
 		// Notices
 		"notice.noActiveNote": "アクティブなノートがありません",
