@@ -206,6 +206,11 @@ export class ChatView extends ItemView {
 		});
 	}
 
+	/** 設定画面からのモデルリスト更新時に呼ばれる */
+	updateModelSelector(): void {
+		this.populateModelSelector();
+	}
+
 	private populateModelSelector(): void {
 		this.modelSelector.empty();
 		const providers = this.plugin.providerRegistry.getAll();
