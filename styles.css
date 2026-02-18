@@ -175,9 +175,53 @@
 }
 
 .llm-message-assistant .llm-message-content pre {
+	position: relative;
 	padding: 8px 12px;
 	border-radius: 6px;
 	overflow-x: auto;
+}
+
+/* --- コードブロック コピーボタン --- */
+
+.llm-code-copy-btn {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	width: 28px;
+	height: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 4px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.llm-message-content pre:hover .llm-code-copy-btn {
+	opacity: 1;
+}
+
+/* モバイルでは常時表示 */
+.is-mobile .llm-code-copy-btn {
+	opacity: 0.7;
+}
+
+.llm-code-copy-btn:hover {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.llm-code-copy-btn.is-copied {
+	color: var(--text-success);
+}
+
+.llm-code-copy-btn svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* --- メッセージヘッダー（ラベル + 編集ボタン） --- */
@@ -420,6 +464,10 @@
 	cursor: not-allowed;
 }
 
+.llm-send-btn.is-empty {
+	opacity: 0.35;
+}
+
 .llm-send-btn svg,
 .llm-send-btn .svg-icon {
 	width: 16px;
@@ -584,6 +632,38 @@
 		transform: scale(1);
 		opacity: 1;
 	}
+}
+
+/* --- ウェルカムメッセージ --- */
+
+.llm-welcome {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 20px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.llm-welcome h3 {
+	margin: 0 0 16px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.llm-welcome-tips {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	font-size: 14px;
+	line-height: 2;
+}
+
+.llm-welcome-tips li::before {
+	content: "· ";
+	color: var(--text-faint);
 }
 
 /* --- 再生成ボタン --- */

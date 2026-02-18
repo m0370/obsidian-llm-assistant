@@ -36,10 +36,14 @@ export class ChatInput {
 			this.send();
 		});
 
-		// auto-expand
+		// auto-expand + Sendボタン状態更新
 		this.textareaEl.addEventListener("input", () => {
 			this.autoExpand();
+			this.updateSendBtnState();
 		});
+
+		// 初期状態（空）
+		this.sendBtn.addClass("is-empty");
 
 		// IME
 		this.textareaEl.addEventListener("compositionstart", () => {
@@ -70,6 +74,10 @@ export class ChatInput {
 		});
 	}
 
+	private updateSendBtnState(): void {
+		this.sendBtn.toggleClass("is-empty", !this.textareaEl.value.trim());
+	}
+
 	private send(): void {
 		const text = this.textareaEl.value.trim();
 		if (!text) return;
@@ -77,6 +85,7 @@ export class ChatInput {
 		this.textareaEl.value = "";
 		this.textareaEl.setCssStyles({ height: "auto" });
 		this.textareaEl.focus();
+		this.updateSendBtnState();
 	}
 
 	triggerSend(): void {
@@ -86,6 +95,7 @@ export class ChatInput {
 	setValue(text: string): void {
 		this.textareaEl.value = text;
 		this.autoExpand();
+		this.updateSendBtnState();
 	}
 
 	focus(): void {

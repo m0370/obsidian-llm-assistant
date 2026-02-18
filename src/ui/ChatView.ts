@@ -80,6 +80,7 @@ export class ChatView extends ItemView {
 	private scrollToBottomBtn: HTMLElement | null = null;
 	private abortController: AbortController | null = null;
 	private regenerateBtn: HTMLElement | null = null;
+	private welcomeEl: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -114,6 +115,9 @@ export class ChatView extends ItemView {
 
 		// チャット出力エリア
 		this.chatOutput = container.createDiv({ cls: "llm-chat-output" });
+
+		// ウェルカムメッセージ（メッセージ0件時に表示）
+		this.showWelcome();
 
 		// 「最新へ」スクロールボタン
 		this.scrollToBottomBtn = container.createDiv({ cls: "llm-scroll-to-bottom is-hidden" });
@@ -407,6 +411,9 @@ export class ChatView extends ItemView {
 	private async handleSend(text: string): Promise<void> {
 		if (!text.trim() || this.isGenerating) return;
 
+		// ウェルカムメッセージを非表示
+		this.hideWelcome();
+
 		// 既存の再生成ボタンを削除
 		this.regenerateBtn?.remove();
 		this.regenerateBtn = null;
@@ -516,6 +523,7 @@ export class ChatView extends ItemView {
 				"",
 				this
 			);
+			this.addCodeCopyButtons(contentEl);
 
 			// 編集提案UIを表示
 			for (const op of writeOperations) {
@@ -1266,6 +1274,24 @@ export class ChatView extends ItemView {
 		return this.plugin.secretManager.getApiKey(provider.id);
 	}
 
+	private showWelcome(): void {
+		if (this.messages.length > 0) return;
+		this.welcomeEl = this.chatOutput.createDiv({ cls: "llm-welcome" });
+		this.welcomeEl.createEl("h3", { text: t("welcome.title") });
+		const tips = this.welcomeEl.createEl("ul", { cls: "llm-welcome-tips" });
+		tips.createEl("li", { text: t("welcome.tip1") });
+		tips.createEl("li", { text: t("welcome.tip2") });
+		tips.createEl("li", { text: t("welcome.tip3") });
+		tips.createEl("li", { text: t("welcome.tip4") });
+	}
+
+	private hideWelcome(): void {
+		if (this.welcomeEl) {
+			this.welcomeEl.remove();
+			this.welcomeEl = null;
+		}
+	}
+
 	private showGeneratingIndicator(): HTMLElement {
 		const el = this.chatOutput.createDiv({ cls: "llm-generating" });
 		el.createSpan({ text: t("chat.generating") });
@@ -1300,6 +1326,35 @@ export class ChatView extends ItemView {
 			}
 			void this.handleSend(userMsg.content);
 		});
+	}
+
+	/** コードブロックにコピーボタンを追加 */
+	private addCodeCopyButtons(containerEl: HTMLElement): void {
+		const codeBlocks = containerEl.querySelectorAll("pre > code");
+		for (const codeEl of Array.from(codeBlocks)) {
+			const preEl = codeEl.parentElement;
+			if (!preEl || preEl.querySelector(".llm-code-copy-btn")) continue;
+
+			preEl.addClass("llm-code-block-wrapper");
+			const copyBtn = preEl.createEl("button", {
+				cls: "llm-code-copy-btn clickable-icon",
+				attr: { "aria-label": t("toolbar.copy") },
+			});
+			setIcon(copyBtn, "copy");
+			copyBtn.addEventListener("click", () => {
+				const text = codeEl.textContent || "";
+				void navigator.clipboard.writeText(text).then(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, "check");
+					copyBtn.addClass("is-copied");
+					setTimeout(() => {
+						copyBtn.empty();
+						setIcon(copyBtn, "copy");
+						copyBtn.removeClass("is-copied");
+					}, 1500);
+				});
+			});
+		}
 	}
 
 	/**
@@ -1352,6 +1407,7 @@ export class ChatView extends ItemView {
 				"",
 				this
 			);
+			this.addCodeCopyButtons(contentEl);
 		}
 
 		this.chatOutput.scrollTop = this.chatOutput.scrollHeight;
