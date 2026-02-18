@@ -219,6 +219,9 @@ export class ChatView extends ItemView {
 		this.modelSelector.empty();
 		const providers = this.plugin.providerRegistry.getAll();
 		providers.forEach((provider) => {
+			// トグルで無効化されたプロバイダーをスキップ
+			if (!this.isProviderEnabled(provider.id)) return;
+
 			const optgroup = this.modelSelector.createEl("optgroup", {
 				attr: { label: provider.name },
 			});
@@ -235,6 +238,12 @@ export class ChatView extends ItemView {
 				}
 			});
 		});
+	}
+
+	private isProviderEnabled(providerId: string): boolean {
+		if (providerId === "openrouter") return this.plugin.settings.enableOpenRouter;
+		if (providerId === "ollama") return this.plugin.settings.enableOllama;
+		return true;
 	}
 
 	private showPlusMenu(evt: MouseEvent | TouchEvent): void {
