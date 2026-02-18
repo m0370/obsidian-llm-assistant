@@ -5,6 +5,7 @@
 /* --- ベース: モバイルファースト --- */
 
 .llm-assistant-view {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -188,6 +189,18 @@
 	gap: 4px;
 }
 
+.llm-message-timestamp {
+	font-size: 11px;
+	color: var(--text-faint);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	margin-left: 4px;
+}
+
+.llm-message:hover .llm-message-timestamp {
+	opacity: 1;
+}
+
 .llm-message-edit-btn {
 	display: none;
 	align-items: center;
@@ -226,6 +239,40 @@
 	.llm-message-edit-btn {
 		display: flex;
 	}
+}
+
+/* --- 「最新へ」スクロールボタン --- */
+
+.llm-scroll-to-bottom {
+	position: absolute;
+	bottom: 80px;
+	right: 16px;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	z-index: 20;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+	transition: opacity 0.2s ease;
+}
+
+.llm-scroll-to-bottom:hover {
+	background: var(--background-modifier-hover);
+}
+
+.llm-scroll-to-bottom.is-hidden {
+	display: none;
+}
+
+.llm-scroll-to-bottom svg {
+	width: 16px;
+	height: 16px;
+	stroke: var(--text-muted);
 }
 
 /* --- ボトムエリア（入力 + アクションバーのラッパー） --- */
@@ -537,6 +584,67 @@
 		transform: scale(1);
 		opacity: 1;
 	}
+}
+
+/* --- 再生成ボタン --- */
+
+.llm-regenerate {
+	display: flex;
+	justify-content: center;
+	padding: 4px 0 8px;
+}
+
+.llm-regenerate-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 16px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	min-height: 28px;
+}
+
+.llm-regenerate-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.llm-regenerate-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* --- 停止ボタン --- */
+
+.llm-stop-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+	padding: 4px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	min-height: 28px;
+}
+
+.llm-stop-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.llm-stop-btn svg {
+	width: 12px;
+	height: 12px;
+	fill: currentColor;
+	stroke: none;
 }
 
 /* ============================================
