@@ -1308,3 +1308,8 @@
 .llm-context-bar.is-hidden {
 	display: none;
 }
+
+/* 汎用非表示クラス */
+.is-hidden {
+	display: none !important;
+}

@@ -1023,7 +1023,7 @@ export class ChatView extends ItemView {
 				new Notice(t("notice.fileCreated", { name: op.path }));
 				container.addClass("llm-edit-applied");
 				applyBtn.setAttribute("disabled", "true");
-				dismissBtn.style.display = "none";
+				dismissBtn.addClass("is-hidden");
 
 				// Undoボタンを表示
 				const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
@@ -1038,7 +1038,7 @@ export class ChatView extends ItemView {
 						}
 						container.removeClass("llm-edit-applied");
 						applyBtn.removeAttribute("disabled");
-						dismissBtn.style.display = "";
+						dismissBtn.removeClass("is-hidden");
 						undoBtn.remove();
 					})();
 				});
@@ -1113,7 +1113,7 @@ export class ChatView extends ItemView {
 			hunk.applied = true;
 			hunkEl.addClass("llm-edit-applied");
 			applyBtn.setAttribute("disabled", "true");
-			dismissBtn.style.display = "none";
+			dismissBtn.addClass("is-hidden");
 
 			// Undoボタン表示
 			if (!undoBtn) {
@@ -1123,7 +1123,7 @@ export class ChatView extends ItemView {
 				undoBtn.addEventListener("click", () => void doUndo());
 			} else {
 				undoBtn.removeAttribute("disabled");
-				undoBtn.style.display = "";
+				undoBtn.removeClass("is-hidden");
 			}
 			new Notice(t("notice.fileEdited", { name: filePath }));
 		};
@@ -1142,8 +1142,8 @@ export class ChatView extends ItemView {
 			hunk.applied = false;
 			hunkEl.removeClass("llm-edit-applied");
 			applyBtn.removeAttribute("disabled");
-			dismissBtn.style.display = "";
-			if (undoBtn) undoBtn.style.display = "none";
+			dismissBtn.removeClass("is-hidden");
+			if (undoBtn) undoBtn.addClass("is-hidden");
 			new Notice(t("notice.fileReverted", { name: filePath }));
 		};
 
