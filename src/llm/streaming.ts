@@ -47,6 +47,7 @@ export async function sendRequest(
 	params: ChatRequest,
 	apiKey: string,
 	onToken?: (token: string) => void,
+	signal?: AbortSignal,
 ): Promise<ChatResponse> {
 	const trimmedKey = apiKey.trim();
 	// Tool Use時はストリーミングを無効化（SSEパースではtool_callsを抽出できないため）
@@ -56,8 +57,9 @@ export async function sendRequest(
 	if (wantStream && provider.supportsCORS) {
 		// デスクトップ/モバイル共通: fetch() SSE試行 → requestUrl()フォールバック
 		try {
-			return await streamWithFetch(provider, params, trimmedKey, onToken);
-		} catch {
+			return await streamWithFetch(provider, params, trimmedKey, onToken, signal);
+		} catch (e) {
+			if (signal?.aborted) throw e;
 			// fetch()失敗（CSP制約・接続エラー等）→ requestUrl()一括受信にフォールバック
 			return completeWithRequestUrl(provider, params, trimmedKey, onToken);
 		}
@@ -75,6 +77,7 @@ async function streamWithFetch(
 	params: ChatRequest,
 	apiKey: string,
 	onToken: (token: string) => void,
+	signal?: AbortSignal,
 ): Promise<ChatResponse> {
 	const body = provider.buildRequestBody({ ...params, stream: true });
 	const headers = provider.buildHeaders(apiKey);
@@ -85,6 +88,7 @@ async function streamWithFetch(
 		method: "POST",
 		headers: { ...headers, "Content-Type": "application/json" },
 		body: JSON.stringify(body),
+		signal,
 	});
 
 	if (!response.ok) {

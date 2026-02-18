@@ -38,6 +38,9 @@ const translations: Record<Locale, Record<string, string>> = {
 
 		// Generating
 		"chat.generating": "Generating",
+		"chat.stop": "Stop",
+		"chat.stopped": "(Generation stopped)",
+		"chat.regenerate": "Regenerate",
 
 		// Notices
 		"notice.noActiveNote": "No active note",
@@ -294,6 +297,9 @@ const translations: Record<Locale, Record<string, string>> = {
 
 		// Generating
 		"chat.generating": "生成中",
+		"chat.stop": "停止",
+		"chat.stopped": "（生成を停止しました）",
+		"chat.regenerate": "再生成",
 
 		// Notices
 		"notice.noActiveNote": "アクティブなノートがありません",
