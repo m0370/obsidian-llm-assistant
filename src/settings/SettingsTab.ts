@@ -38,13 +38,14 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			});
 
-		// プロバイダー選択
+		// プロバイダー選択（無効化されたプロバイダーを除外）
 		const allProviders = this.plugin.providerRegistry.getAll();
+		const enabledProviders = allProviders.filter((p) => this.isProviderEnabled(p.id));
 		new Setting(containerEl)
 			.setName(t("settings.provider"))
 			.setDesc(t("settings.providerDesc"))
 			.addDropdown((dropdown) => {
-				allProviders.forEach((p) => {
+				enabledProviders.forEach((p) => {
 					dropdown.addOption(p.id, p.name);
 				});
 				dropdown.setValue(this.plugin.settings.activeProvider);
@@ -139,6 +140,36 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName(t("settings.apiKeys")).setHeading();
 
 		allProviders.filter((p) => p.requiresApiKey).forEach((provider) => {
+			// OpenRouter / Ollama にはトグルを表示
+			const toggleKey = this.getProviderToggleKey(provider.id);
+			if (toggleKey) {
+				new Setting(containerEl)
+					.setName(t("settings.enableProvider", { name: provider.name }))
+					.setDesc(t("settings.enableProviderDesc", { name: provider.name }))
+					.addToggle((toggle) => {
+						toggle.setValue(this.plugin.settings[toggleKey] as boolean);
+						toggle.onChange(async (value) => {
+							(this.plugin.settings[toggleKey] as boolean) = value;
+							// 無効化したプロバイダーがactiveなら、最初の有効プロバイダーに切り替え
+							if (!value && this.plugin.settings.activeProvider === provider.id) {
+								const firstEnabled = allProviders.find((p) => this.isProviderEnabled(p.id) && p.id !== provider.id);
+								if (firstEnabled) {
+									this.plugin.settings.activeProvider = firstEnabled.id;
+									if (firstEnabled.models.length > 0) {
+										this.plugin.settings.activeModel = firstEnabled.models[0].id;
+									}
+								}
+							}
+							await this.plugin.saveSettings();
+							this.display();
+							this.syncChatViewModelSelector();
+						});
+					});
+			}
+
+			// トグルがOFFの場合、API Key入力欄を非表示
+			if (!this.isProviderEnabled(provider.id)) return;
+
 			const desc = provider.apiKeyUrl
 				? `${t("settings.apiKeyInput", { name: provider.name })}  |  ${t("settings.apiKeyUrl", { url: provider.apiKeyUrl })}`
 				: t("settings.apiKeyInput", { name: provider.name });
@@ -204,6 +235,32 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			});
 		});
+
+		// Ollama トグル（requiresApiKey=false のため上記ループに含まれない）
+		const ollamaProvider = allProviders.find((p) => p.id === "ollama");
+		if (ollamaProvider) {
+			new Setting(containerEl)
+				.setName(t("settings.enableProvider", { name: ollamaProvider.name }))
+				.setDesc(t("settings.enableProviderDesc", { name: ollamaProvider.name }))
+				.addToggle((toggle) => {
+					toggle.setValue(this.plugin.settings.enableOllama);
+					toggle.onChange(async (value) => {
+						this.plugin.settings.enableOllama = value;
+						if (!value && this.plugin.settings.activeProvider === "ollama") {
+							const firstEnabled = allProviders.find((p) => this.isProviderEnabled(p.id) && p.id !== "ollama");
+							if (firstEnabled) {
+								this.plugin.settings.activeProvider = firstEnabled.id;
+								if (firstEnabled.models.length > 0) {
+									this.plugin.settings.activeModel = firstEnabled.models[0].id;
+								}
+							}
+						}
+						await this.plugin.saveSettings();
+						this.display();
+						this.syncChatViewModelSelector();
+					});
+				});
+		}
 
 		// カスタムエンドポイント設定
 		new Setting(containerEl).setName(t("settings.customEndpoint")).setHeading();
@@ -823,5 +880,19 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				this.plugin.settings.customModelId,
 			);
 		}
+	}
+
+	/** トグル対象プロバイダーの設定キーを返す。対象外なら null */
+	private getProviderToggleKey(providerId: string): keyof import("../constants").LLMAssistantSettings | null {
+		if (providerId === "openrouter") return "enableOpenRouter";
+		if (providerId === "ollama") return "enableOllama";
+		return null;
+	}
+
+	/** プロバイダーが有効かどうか。トグル対象外は常に有効 */
+	isProviderEnabled(providerId: string): boolean {
+		if (providerId === "openrouter") return this.plugin.settings.enableOpenRouter;
+		if (providerId === "ollama") return this.plugin.settings.enableOllama;
+		return true;
 	}
 }
