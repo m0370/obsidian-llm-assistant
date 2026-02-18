@@ -1284,6 +1284,46 @@
 	margin-bottom: 12px;
 }
 
+/* --- 高度な設定内ボタン行のモバイル対応 --- */
+/* RAGインデックス操作・Embeddingインデックス操作などのボタンが
+   モバイル画面からはみ出さないよう縦積み + 折り返しレイアウトにする */
+.llm-settings-advanced-details .setting-item {
+	flex-wrap: wrap;
+}
+
+.llm-settings-advanced-details .setting-item .setting-item-info {
+	flex: 1 1 100%;
+	min-width: 0;
+}
+
+.llm-settings-advanced-details .setting-item .setting-item-control {
+	flex-wrap: wrap;
+	gap: 6px;
+	width: 100%;
+	justify-content: flex-start;
+}
+
+.llm-settings-advanced-details .setting-item .setting-item-control > button {
+	white-space: nowrap;
+	min-width: 0;
+}
+
+@media (min-width: 900px) {
+	.llm-settings-advanced-details .setting-item {
+		flex-wrap: nowrap;
+	}
+
+	.llm-settings-advanced-details .setting-item .setting-item-info {
+		flex: 1 1 0%;
+	}
+
+	.llm-settings-advanced-details .setting-item .setting-item-control {
+		flex-wrap: nowrap;
+		width: auto;
+		justify-content: flex-end;
+	}
+}
+
 /* --- 設定画面: インラインスタイル代替クラス --- */
 
 .llm-settings-input-full {
