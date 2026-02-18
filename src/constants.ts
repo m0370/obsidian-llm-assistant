@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS: LLMAssistantSettings = {
 	customModelId: "",
 	language: "auto",
 	fontSize: "medium",
+	// プロバイダー有効/無効
+	enableOpenRouter: false,
+	enableOllama: false,
 	// RAG設定
 	ragEnabled: false,
 	ragTopK: 5,
@@ -43,6 +46,9 @@ export interface LLMAssistantSettings {
 	customModelId: string;
 	language: "auto" | "en" | "ja";
 	fontSize: "small" | "medium" | "large";
+	// プロバイダー有効/無効
+	enableOpenRouter: boolean;
+	enableOllama: boolean;
 	// RAG設定
 	ragEnabled: boolean;
 	ragTopK: number;

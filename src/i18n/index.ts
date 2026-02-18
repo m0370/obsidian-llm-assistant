@@ -147,6 +147,10 @@ const translations: Record<Locale, Record<string, string>> = {
 		"preset.codeReviewer": "Code Reviewer",
 		"preset.codeReviewer.prompt": "You are a software engineering expert. Review code from quality, performance, and security perspectives.",
 
+		// Provider toggles
+		"settings.enableProvider": "Enable {name}",
+		"settings.enableProviderDesc": "Show {name} models in the model selector. Turn off to hide.",
+
 		// Provider / model labels
 		"provider.ollama": "Ollama (Local)",
 		"provider.custom": "Custom Endpoint",
@@ -412,6 +416,10 @@ const translations: Record<Locale, Record<string, string>> = {
 		"preset.translator.prompt": "あなたはプロの翻訳者です。原文のニュアンスを保ちつつ、自然な訳文を作成してください。",
 		"preset.codeReviewer": "コードレビュアー",
 		"preset.codeReviewer.prompt": "あなたはソフトウェアエンジニアリングの専門家です。コードの品質、パフォーマンス、セキュリティの観点からレビューしてください。",
+
+		// Provider toggles
+		"settings.enableProvider": "{name} を有効化",
+		"settings.enableProviderDesc": "{name} のモデルをモデル選択に表示します。オフにすると非表示になります。",
 
 		// Provider / model labels
 		"provider.ollama": "Ollama (ローカル)",
