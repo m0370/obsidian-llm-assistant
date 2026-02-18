@@ -140,21 +140,33 @@ export class OpenAIProvider implements LLMProvider {
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
 		const data = response.json.data as Array<Record<string, unknown>>;
-		// Filter for chat-capable models
-		const chatModels = data.filter(m => {
-			const id = m.id as string;
-			return id.startsWith("gpt-") || id.startsWith("o1") ||
-				id.startsWith("o3") || id.startsWith("o4") ||
-				id.startsWith("chatgpt-");
-		});
-
-		return chatModels.map(m => {
-			const id = m.id as string;
-			return {
-				id,
-				name: id,
+		const allModels = data
+			.filter(m => {
+				const id = m.id as string;
+				if (!(id.startsWith("gpt-") || id.startsWith("o1") ||
+					id.startsWith("o3") || id.startsWith("o4") ||
+					id.startsWith("chatgpt-"))) return false;
+				// 日付スナップショット(YYYY-MM-DD)を除外
+				if (/\d{4}-\d{2}-\d{2}/.test(id)) return false;
+				// 特殊バリアントを除外
+				if (/realtime|audio|search|transcribe|tts|dall-e|whisper/.test(id)) return false;
+				return true;
+			})
+			.map(m => ({
+				id: m.id as string,
+				name: (m.id as string),
 				contextWindow: 128000,
-			};
-		}).sort((a, b) => b.id.localeCompare(a.id));
+			}))
+			.sort((a, b) => b.id.localeCompare(a.id));
+
+		// 同一シリーズの重複を除去（gpt-4oとgpt-4o-miniは別シリーズ）
+		const seen = new Set<string>();
+		return allModels.filter(m => {
+			// "gpt-4o-mini" → "gpt-4o-mini", "gpt-4o" → "gpt-4o", "o3" → "o3", "o3-mini" → "o3-mini"
+			const series = m.id.replace(/-preview$/, "");
+			if (seen.has(series)) return false;
+			seen.add(series);
+			return true;
+		});
 	}
 }
