@@ -139,18 +139,36 @@ export class OpenRouterProvider implements LLMProvider {
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
 		const data = response.json.data as Array<Record<string, unknown>>;
-		return data
-			.filter(m => {
-				const id = m.id as string;
-				return id.includes("claude") || id.includes("gpt") ||
-					id.includes("gemini") || id.includes("llama") ||
-					id.includes("deepseek") || id.includes("qwen");
-			})
-			.map(m => ({
-				id: m.id as string,
-				name: (m.name as string) || (m.id as string),
-				contextWindow: (m.context_length as number) || 128000,
-			}))
-			.slice(0, 30);
+		const allModels = data.map(m => ({
+			id: m.id as string,
+			name: (m.name as string) || (m.id as string),
+			contextWindow: (m.context_length as number) || 128000,
+		}));
+
+		// 取得したいシリーズ（優先度順）— 各シリーズから最新1つだけ選出
+		const wantedPrefixes = [
+			"anthropic/claude-opus",
+			"anthropic/claude-sonnet",
+			"anthropic/claude-haiku",
+			"openai/gpt-5",
+			"openai/gpt-4o",
+			"openai/o4",
+			"openai/o3",
+			"google/gemini-2.5-pro",
+			"google/gemini-2.5-flash",
+			"meta-llama/llama-4",
+			"deepseek/deepseek-r1",
+			"qwen/qwen3",
+		];
+
+		const picked: ModelInfo[] = [];
+		for (const prefix of wantedPrefixes) {
+			// 各シリーズのモデルを降順ソートして最新を選択
+			const candidates = allModels
+				.filter(m => m.id.startsWith(prefix) && !m.id.includes(":free") && !m.id.includes(":extended"))
+				.sort((a, b) => b.id.localeCompare(a.id));
+			if (candidates.length > 0) picked.push(candidates[0]);
+		}
+		return picked;
 	}
 }

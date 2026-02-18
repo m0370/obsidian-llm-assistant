@@ -111,18 +111,31 @@ export class AnthropicProvider implements LLMProvider {
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
 		const data = response.json.data as Array<Record<string, unknown>>;
-		return data
-			.filter(m => {
-				const id = m.id as string;
-				// claude-*のみ、かつエイリアス（日付なし）は除外して重複を防ぐ
-				return id.startsWith("claude-") && !id.endsWith("-latest");
-			})
+		const allModels = data
+			.filter(m => (m.id as string).startsWith("claude-"))
 			.map(m => ({
 				id: m.id as string,
 				name: (m.display_name as string) || (m.id as string),
 				contextWindow: 200000,
-			}))
-			.slice(0, 20);
+			}));
+
+		// 各ティア(opus/sonnet/haiku)から最新1つだけ選出
+		const tiers = ["opus", "sonnet", "haiku"];
+		const picked: ModelInfo[] = [];
+		for (const tier of tiers) {
+			const candidates = allModels.filter(m => m.id.includes(`-${tier}-`));
+			if (!candidates.length) continue;
+			// 非日付版（alias）を優先、なければ日付降順で最新を選択
+			const nonDated = candidates.filter(m => !/\d{8}$/.test(m.id));
+			if (nonDated.length > 0) {
+				nonDated.sort((a, b) => b.id.localeCompare(a.id));
+				picked.push(nonDated[0]);
+			} else {
+				candidates.sort((a, b) => b.id.localeCompare(a.id));
+				picked.push(candidates[0]);
+			}
+		}
+		return picked;
 	}
 
 	async validateApiKey(apiKey: string): Promise<boolean> {
