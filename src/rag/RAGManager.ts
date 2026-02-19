@@ -22,6 +22,7 @@ import { VaultProximityScorer, type ProximityConfig } from "./VaultProximityScor
 
 interface IndexCacheEntry {
 	hash: string;
+	mtime: number;
 	chunks: Array<{
 		id: string;
 		filePath: string;
@@ -48,8 +49,10 @@ export class RAGManager {
 	private vaultReader: VaultReader;
 	private searchEngine: TextSearchEngine;
 	private fileHashes: Map<string, string> = new Map();
+	private fileMtimes: Map<string, number> = new Map();
 	private indexBuilt = false;
 	private isIndexing = false;
+	private cacheSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// 設定
 	private topK: number;
@@ -421,22 +424,39 @@ export class RAGManager {
 			for (const file of currentFiles) {
 				const cached = cache.files[file.path];
 				if (cached) {
-					// ファイルが存在 → ハッシュ比較はファイル読み込みが必要なので、mtime で粗くチェック
-					// mtimeが同じならキャッシュのチャンクをそのまま使用
 					const stat = await this.app.vault.adapter.stat(file.path);
-					const cachedHash = cached.hash;
 
-					// mtimeベースの高速チェック（ハッシュ計算不要）
+					// mtime 高速チェック: mtime が同じならハッシュ計算不要
+					if (stat && cached.mtime && stat.mtime === cached.mtime) {
+						this.fileHashes.set(file.path, cached.hash);
+						this.fileMtimes.set(file.path, cached.mtime);
+						for (const c of cached.chunks) {
+							unchangedChunks.push({
+								id: c.id,
+								filePath: c.filePath,
+								fileName: c.fileName,
+								content: c.content,
+								heading: c.heading,
+								startLine: c.startLine,
+								endLine: c.endLine,
+								tokens: c.tokens,
+								metadata: c.metadata,
+							});
+						}
+						continue;
+					}
+
+					// mtime が異なる or mtime なし → ハッシュ計算で確定判定
 					if (stat && cached.chunks.length > 0) {
-						// キャッシュからチャンクを復元
 						const content = await this.vaultReader.cachedReadFile(file);
 						const hash = await this.computeHash(content);
 
-						if (hash === cachedHash) {
-							// 変更なし → キャッシュから復元
+						if (hash === cached.hash) {
+							// 内容同一（mtimeだけ変わった） → 復元 + mtime 更新
 							this.fileHashes.set(file.path, hash);
+							this.fileMtimes.set(file.path, stat.mtime);
 							for (const c of cached.chunks) {
-								const chunk: DocumentChunk = {
+								unchangedChunks.push({
 									id: c.id,
 									filePath: c.filePath,
 									fileName: c.fileName,
@@ -446,16 +466,13 @@ export class RAGManager {
 									endLine: c.endLine,
 									tokens: c.tokens,
 									metadata: c.metadata,
-								};
-								unchangedChunks.push(chunk);
+								});
 							}
 							continue;
 						}
 					}
-					// ハッシュ不一致 → 再処理
 					addedOrModified.push(file);
 				} else {
-					// 新規ファイル
 					addedOrModified.push(file);
 				}
 			}
@@ -488,6 +505,11 @@ export class RAGManager {
 				const hash = await this.computeHash(content);
 				this.fileHashes.set(file.path, hash);
 
+				const stat = await this.app.vault.adapter.stat(file.path);
+				if (stat) {
+					this.fileMtimes.set(file.path, stat.mtime);
+				}
+
 				const chunks = chunkDocument(
 					file.path,
 					file.basename,
@@ -505,6 +527,7 @@ export class RAGManager {
 			}
 
 			this.indexBuilt = true;
+			await this.saveIndexCache();
 
 			// Vault距離スコア: リンクグラフ構築
 			this.proximityScorer?.buildLinkGraph();
@@ -525,6 +548,7 @@ export class RAGManager {
 		try {
 			this.searchEngine.clear();
 			this.fileHashes.clear();
+			this.fileMtimes.clear();
 			this.chunkMap.clear();
 
 			const allFiles = this.vaultReader.getAllMarkdownFiles()
@@ -538,6 +562,11 @@ export class RAGManager {
 				const content = await this.vaultReader.cachedReadFile(file);
 				const hash = await this.computeHash(content);
 				this.fileHashes.set(file.path, hash);
+
+				const stat = await this.app.vault.adapter.stat(file.path);
+				if (stat) {
+					this.fileMtimes.set(file.path, stat.mtime);
+				}
 
 				const chunks = chunkDocument(
 					file.path,
@@ -569,6 +598,7 @@ export class RAGManager {
 			);
 
 			this.indexBuilt = true;
+			await this.saveIndexCache();
 
 			// Vault距離スコア: リンクグラフ構築
 			this.proximityScorer?.buildLinkGraph();
@@ -597,6 +627,11 @@ export class RAGManager {
 		// 旧チャンクを削除
 		this.searchEngine.removeFile(filePath);
 		this.fileHashes.set(filePath, newHash);
+
+		const stat = await this.app.vault.adapter.stat(filePath);
+		if (stat) {
+			this.fileMtimes.set(filePath, stat.mtime);
+		}
 
 		// chunkMapから旧チャンクを削除
 		for (const chunkId of this.chunkMap.keys()) {
@@ -629,6 +664,8 @@ export class RAGManager {
 
 		// Vault距離スコア: リンクグラフ増分更新
 		this.proximityScorer?.updateFileInGraph(filePath);
+
+		this.debouncedSaveCache();
 	}
 
 	/**
@@ -638,6 +675,7 @@ export class RAGManager {
 		if (!this.indexBuilt) return;
 		this.searchEngine.removeFile(filePath);
 		this.fileHashes.delete(filePath);
+		this.fileMtimes.delete(filePath);
 		this.vectorStore?.removeByFilePath(filePath);
 
 		// chunkMapから該当ファイルのエントリを削除
@@ -757,6 +795,7 @@ export class RAGManager {
 	clearIndex(): void {
 		this.searchEngine.clear();
 		this.fileHashes.clear();
+		this.fileMtimes.clear();
 		this.chunkMap.clear();
 		this.indexBuilt = false;
 	}
@@ -808,6 +847,10 @@ export class RAGManager {
 			clearTimeout(timer);
 		}
 		this.updateTimers.clear();
+		if (this.cacheSaveTimer) {
+			clearTimeout(this.cacheSaveTimer);
+			this.cacheSaveTimer = null;
+		}
 		this.cleanupIdleDetection();
 		this.proximityScorer?.destroy();
 		this.proximityScorer = null;
@@ -832,11 +875,24 @@ export class RAGManager {
 	}
 
 	/**
+	 * デバウンス付きキャッシュ自動保存（増分更新後に呼ばれる）
+	 */
+	private debouncedSaveCache(): void {
+		if (this.cacheSaveTimer) clearTimeout(this.cacheSaveTimer);
+		this.cacheSaveTimer = setTimeout(() => {
+			this.cacheSaveTimer = null;
+			void this.saveIndexCache().catch((e) =>
+				console.warn("RAG cache auto-save failed:", e)
+			);
+		}, 30_000);
+	}
+
+	/**
 	 * インデックスキャッシュをディスクに保存
 	 */
 	private async saveIndexCache(): Promise<void> {
 		const cache: IndexCache = {
-			version: 1,
+			version: 2,
 			chunkStrategy: this.chunkStrategy,
 			chunkMaxTokens: this.chunkMaxTokens,
 			excludeFolders: this.excludeFolders.join(","),
@@ -855,6 +911,7 @@ export class RAGManager {
 			const chunks = chunksByFile.get(filePath) ?? [];
 			cache.files[filePath] = {
 				hash,
+				mtime: this.fileMtimes.get(filePath) ?? 0,
 				chunks: chunks.map((c) => ({
 					id: c.id,
 					filePath: c.filePath,
@@ -889,7 +946,7 @@ export class RAGManager {
 			}
 			const raw = await this.app.vault.adapter.read(this.indexCachePath);
 			const cache: IndexCache = JSON.parse(raw);
-			if (cache.version !== 1) return null;
+			if (cache.version !== 2) return null;
 			return cache;
 		} catch (e) {
 			console.warn("RAG index cache load failed:", e);
