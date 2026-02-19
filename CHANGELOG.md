@@ -4,6 +4,13 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.15] - 2026-02-19
+
+### Added
+- `vault_list` tool: LLM can now list files/folders in the vault with sorting, filtering, and pagination ([#53](https://github.com/m0370/obsidian-LLM/issues/53))
+- `dataview_query` tool: LLM can execute Dataview DQL queries when the Dataview plugin is installed ([#53](https://github.com/m0370/obsidian-LLM/issues/53))
+- Dataview install suggestion: when Dataview is not installed, LLM is instructed to suggest it for advanced queries
+
 ## [0.4.14] - 2026-02-19
 
 ### Changed
@@ -238,6 +245,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Obsidian LLM Assistantプラグインの全ての注目すべき変更点を記録します。
 
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいています。
+
+## [0.4.15] - 2026-02-19
+
+### 追加
+- `vault_list`ツール: LLMがVault内のファイル/フォルダ一覧をソート・フィルタ・ページネーション付きで取得可能に ([#53](https://github.com/m0370/obsidian-LLM/issues/53))
+- `dataview_query`ツール: Dataviewプラグインインストール時にLLMがDQLクエリを実行可能に ([#53](https://github.com/m0370/obsidian-LLM/issues/53))
+- Dataview未インストール時の案内: 高度なクエリが必要な場面でDataviewインストールを提案するようLLMに指示
 
 ## [0.4.14] - 2026-02-19
 

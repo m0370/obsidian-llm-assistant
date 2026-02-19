@@ -43,6 +43,26 @@ const VAULT_TOOLS: ToolDefinition[] = [
 	},
 ];
 
+/** vault_list ツール定義（常時利用可能） */
+const VAULT_LIST_TOOL: ToolDefinition = {
+	name: "vault_list",
+	description: "List files and folders in the user's Obsidian vault. Use this to explore vault structure, find recently modified files, locate empty notes, or browse folder contents. Returns file metadata (path, size, modification time) without file contents — use vault_read to read specific files.",
+	input_schema: {
+		type: "object",
+		properties: {
+			folder: { type: "string", description: "Folder path to list (default: vault root)" },
+			recursive: { type: "boolean", description: "Include subfolders (default: true)" },
+			sort_by: { type: "string", enum: ["mtime", "ctime", "name", "size"], description: "Sort order (default: mtime)" },
+			limit: { type: "number", description: "Max items to return, 1-200 (default: 50)" },
+			offset: { type: "number", description: "Skip first N items for pagination (default: 0)" },
+			extensions: { type: "string", description: "File extensions to include, comma-separated (default: md)" },
+			include_folders: { type: "boolean", description: "Include folders in results (default: false)" },
+			size_filter: { type: "string", enum: ["empty", "small", "large"], description: "Filter by size: empty (0 bytes), small (<1KB), large (>=100KB)" },
+		},
+		required: [],
+	},
+};
+
 /** vault_search ツール定義（RAG有効時のみ追加） */
 const VAULT_SEARCH_TOOL: ToolDefinition = {
 	name: "vault_search",
@@ -52,6 +72,22 @@ const VAULT_SEARCH_TOOL: ToolDefinition = {
 		properties: {
 			query: { type: "string", description: "Search query" },
 			topK: { type: "number", description: "Number of results (default: 5, max: 10)" },
+		},
+		required: ["query"],
+	},
+};
+
+/** dataview_query ツール定義（Dataviewプラグイン有効時のみ追加） */
+const DATAVIEW_QUERY_TOOL: ToolDefinition = {
+	name: "dataview_query",
+	description: "Execute a Dataview Query Language (DQL) query against the vault. Requires the Dataview community plugin. Use for advanced queries: filtering by tags, frontmatter, dates, aggregations, task lists, etc. For simple file listing, prefer vault_list instead.",
+	input_schema: {
+		type: "object",
+		properties: {
+			query: {
+				type: "string",
+				description: "DQL query string (e.g. 'TABLE file.mtime FROM #project WHERE status = \"active\" SORT file.mtime DESC')",
+			},
 		},
 		required: ["query"],
 	},
@@ -476,7 +512,7 @@ export class ChatView extends ItemView {
 			this.abortController?.abort();
 		});
 
-		// アシスタントメッセージの枠を先に作成
+		// アシスタントメッセージの枠を先に作成（空コンテンツは ChatMessage 側で自動非表示）
 		const assistantMsg: MessageData = {
 			role: "assistant",
 			content: "",
@@ -586,6 +622,12 @@ export class ChatView extends ItemView {
 		// 2. ファイル読み込み・編集機能の指示（プロバイダーで分岐）
 		if (provider?.supportsToolUse) {
 			parts.push(t("context.toolUseInstruction"));
+			// Dataview未インストール時の案内
+
+			const hasDataview = !!(this.app as any).plugins?.plugins?.["dataview"]?.api;
+			if (!hasDataview) {
+				parts.push(t("context.dataviewSuggestion"));
+			}
 		} else {
 			parts.push(t("context.vaultReadInstruction"));
 			parts.push(t("context.vaultWriteInstruction"));
@@ -758,10 +800,15 @@ export class ChatView extends ItemView {
 				messageComponent.updateContent(t("chat.readingFiles"));
 			}
 
-			// RAG有効時はvault_searchツールを追加
-			const tools = this.plugin.ragManager?.isBuilt()
-				? [...VAULT_TOOLS, VAULT_SEARCH_TOOL]
-				: VAULT_TOOLS;
+			// ツール配列を構築（vault_list常時 + vault_search/dataview_query条件付き）
+
+			const hasDataview = !!(this.app as any).plugins?.plugins?.["dataview"]?.api;
+			const tools = [
+				...VAULT_TOOLS,
+				VAULT_LIST_TOOL,
+				...(this.plugin.ragManager?.isBuilt() ? [VAULT_SEARCH_TOOL] : []),
+				...(hasDataview ? [DATAVIEW_QUERY_TOOL] : []),
+			];
 
 			const response = await sendRequest(
 				provider,
@@ -847,6 +894,33 @@ export class ChatView extends ItemView {
 						toolUseId: toolUse.id, name: toolUse.name,
 						content: searchResult,
 					});
+				} else if (toolUse.name === "vault_list") {
+					// vault_list: VaultReaderに委譲
+					messageComponent.updateContent(t("chat.listingFiles"));
+					const result = this.plugin.vaultReader.listVaultContents({
+						folder: toolUse.input.folder as string | undefined,
+						recursive: toolUse.input.recursive as boolean | undefined,
+						sort_by: toolUse.input.sort_by as "mtime" | "ctime" | "name" | "size" | undefined,
+						limit: toolUse.input.limit as number | undefined,
+						offset: toolUse.input.offset as number | undefined,
+						extensions: toolUse.input.extensions as string | undefined,
+						include_folders: toolUse.input.include_folders as boolean | undefined,
+						size_filter: toolUse.input.size_filter as "empty" | "small" | "large" | undefined,
+					});
+					toolResults.push({
+						toolUseId: toolUse.id, name: toolUse.name,
+						content: this.formatVaultListResult(result),
+					});
+				} else if (toolUse.name === "dataview_query") {
+					// dataview_query: VaultReaderに委譲
+					messageComponent.updateContent(t("chat.queryingDataview"));
+					const dql = toolUse.input.query as string;
+					const dvResult = this.plugin.vaultReader.executeDataviewQuery(dql);
+					toolResults.push({
+						toolUseId: toolUse.id, name: toolUse.name,
+						content: dvResult.success ? dvResult.result : `Error: ${dvResult.error}`,
+						isError: !dvResult.success,
+					});
 				}
 			}
 
@@ -862,6 +936,36 @@ export class ChatView extends ItemView {
 	/**
 	 * 応答中の<vault_read>path</vault_read>タグからファイルパスを抽出
 	 */
+	/**
+	 * vault_list結果をMarkdownテーブル形式にフォーマット
+	 */
+	private formatVaultListResult(result: { entries: Array<{path: string; name: string; type: string; size: number; mtime: number; children?: number}>; total: number; hasMore: boolean }): string {
+		if (result.total === 0) return "No files found matching the criteria.";
+
+		const lines: string[] = [];
+		lines.push(`Found ${result.total} items total. Showing ${result.entries.length} items.${result.hasMore ? " (use offset for more)" : ""}`);
+		lines.push("");
+		lines.push("Path | Type | Size | Modified");
+		lines.push("---|---|---|---");
+		for (const entry of result.entries) {
+			const size = entry.type === "folder"
+				? `${entry.children ?? 0} items`
+				: this.formatFileSize(entry.size);
+			const mtime = entry.mtime > 0
+				? new Date(entry.mtime).toISOString().replace("T", " ").substring(0, 16)
+				: "-";
+			lines.push(`${entry.path} | ${entry.type} | ${size} | ${mtime}`);
+		}
+		return lines.join("\n");
+	}
+
+	private formatFileSize(bytes: number): string {
+		if (bytes === 0) return "0B";
+		if (bytes < 1024) return `${bytes}B`;
+		if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)}KB`;
+		return `${(bytes / 1048576).toFixed(1)}MB`;
+	}
+
 	/**
 	 * Embedding用APIキーを取得
 	 */
