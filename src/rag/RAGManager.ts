@@ -18,6 +18,7 @@ import { t } from "../i18n";
 import type { EmbeddingProvider, EmbeddingProviderRegistry } from "./EmbeddingProvider";
 import { VectorStore } from "./VectorStore";
 import { HybridSearchEngine } from "./HybridSearchEngine";
+import { VaultProximityScorer, type ProximityConfig } from "./VaultProximityScorer";
 
 interface IndexCacheEntry {
 	hash: string;
@@ -74,6 +75,10 @@ export class RAGManager {
 	private idleListeners: Array<() => void> = [];
 	private priorityEmbedFiles: Set<string> = new Set(); // 編集されたファイルを優先Embedding
 
+	// Vault距離スコア
+	private proximityScorer: VaultProximityScorer | null = null;
+	private proximityConfig: ProximityConfig = { enabled: false, boostFactor: 0.5 };
+
 	// Vaultイベント用デバウンス
 	private updateTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
@@ -118,6 +123,8 @@ export class RAGManager {
 		chunkStrategy?: ChunkStrategy;
 		chunkMaxTokens?: number;
 		excludeFolders?: string;
+		ragProximityEnabled?: boolean;
+		ragProximityBoostFactor?: number;
 	}): void {
 		if (options.topK !== undefined) this.topK = options.topK;
 		if (options.minScore !== undefined) this.minScore = options.minScore;
@@ -128,6 +135,25 @@ export class RAGManager {
 				.split(",")
 				.map((f) => f.trim())
 				.filter(Boolean);
+		}
+		if (options.ragProximityEnabled !== undefined) {
+			this.proximityConfig.enabled = options.ragProximityEnabled;
+			if (options.ragProximityEnabled && !this.proximityScorer) {
+				this.initializeProximity();
+			}
+		}
+		if (options.ragProximityBoostFactor !== undefined) {
+			this.proximityConfig.boostFactor = options.ragProximityBoostFactor;
+		}
+	}
+
+	/**
+	 * Vault距離スコアを初期化
+	 */
+	initializeProximity(): void {
+		this.proximityScorer = new VaultProximityScorer(this.app);
+		if (this.indexBuilt) {
+			this.proximityScorer.buildLinkGraph();
 		}
 	}
 
@@ -479,6 +505,10 @@ export class RAGManager {
 			}
 
 			this.indexBuilt = true;
+
+			// Vault距離スコア: リンクグラフ構築
+			this.proximityScorer?.buildLinkGraph();
+
 			return addedOrModified.length + deletedCount;
 		} finally {
 			this.isIndexing = false;
@@ -539,6 +569,9 @@ export class RAGManager {
 			);
 
 			this.indexBuilt = true;
+
+			// Vault距離スコア: リンクグラフ構築
+			this.proximityScorer?.buildLinkGraph();
 		} finally {
 			this.isIndexing = false;
 		}
@@ -593,6 +626,9 @@ export class RAGManager {
 		}
 
 		await this.searchEngine.addChunks(chunks);
+
+		// Vault距離スコア: リンクグラフ増分更新
+		this.proximityScorer?.updateFileInGraph(filePath);
 	}
 
 	/**
@@ -610,6 +646,9 @@ export class RAGManager {
 				this.chunkMap.delete(chunkId);
 			}
 		}
+
+		// Vault距離スコア: リンクグラフから除去
+		this.proximityScorer?.removeFileFromGraph(filePath);
 	}
 
 	/**
@@ -621,20 +660,32 @@ export class RAGManager {
 		const k = topK ?? this.topK;
 		const score = minScore ?? this.minScore;
 
+		let results: SearchResult[];
+
 		// Embedding有効 + VectorStore構築済み + APIキーあり → ハイブリッド検索
 		if (this.embeddingEnabled && this.vectorStore && this.hybridEngine && apiKey && this.vectorStore.size > 0) {
 			try {
-				return await this.hybridEngine.search(
+				results = await this.hybridEngine.search(
 					query, apiKey, this.embeddingModel,
 					k, score, this.chunkMap, this.embeddingDimensions,
 				);
 			} catch (e) {
 				console.warn("Embedding search failed, falling back to text search:", e);
+				results = this.searchEngine.search(query, k, score);
 			}
+		} else {
+			// TF-IDFのみ
+			results = this.searchEngine.search(query, k, score);
 		}
 
-		// TF-IDFのみ
-		return this.searchEngine.search(query, k, score);
+		// Vault距離スコアによるブースト
+		if (this.proximityScorer && this.proximityConfig.enabled) {
+			const anchor = this.vaultReader.getActiveFile()
+				?? this.vaultReader.getMostRecentLeafFile(this.app);
+			results = this.proximityScorer.applyProximityBoost(results, anchor, this.proximityConfig);
+		}
+
+		return results;
 	}
 
 	/**
@@ -758,6 +809,8 @@ export class RAGManager {
 		}
 		this.updateTimers.clear();
 		this.cleanupIdleDetection();
+		this.proximityScorer?.destroy();
+		this.proximityScorer = null;
 
 		// TF-IDFインデックスキャッシュを永続化
 		if (this.indexBuilt) {

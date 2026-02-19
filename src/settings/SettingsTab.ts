@@ -511,6 +511,38 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			}
 
+			// --- Vault距離スコアセクション ---
+			new Setting(advancedDetailsEl).setName(t("settings.ragProximity")).setHeading();
+
+			new Setting(advancedDetailsEl)
+				.setName(t("settings.ragProximityEnabled"))
+				.setDesc(t("settings.ragProximityEnabledDesc"))
+				.addToggle((toggle) => {
+					toggle.setValue(this.plugin.settings.ragProximityEnabled);
+					toggle.onChange(async (value) => {
+						this.plugin.settings.ragProximityEnabled = value;
+						await this.plugin.saveSettings();
+						this.plugin.ragManager?.updateSettings({ ragProximityEnabled: value });
+						this.display();
+					});
+				});
+
+			if (this.plugin.settings.ragProximityEnabled) {
+				new Setting(advancedDetailsEl)
+					.setName(t("settings.ragProximityBoostFactor"))
+					.setDesc(t("settings.ragProximityBoostFactorDesc"))
+					.addSlider((slider) => {
+						slider.setLimits(0, 1, 0.1);
+						slider.setValue(this.plugin.settings.ragProximityBoostFactor);
+						slider.setDynamicTooltip();
+						slider.onChange(async (value) => {
+							this.plugin.settings.ragProximityBoostFactor = value;
+							await this.plugin.saveSettings();
+							this.plugin.ragManager?.updateSettings({ ragProximityBoostFactor: value });
+						});
+					});
+			}
+
 			// --- Embedding検索セクション ---
 			new Setting(advancedDetailsEl).setName(t("settings.ragEmbedding")).setHeading();
 
