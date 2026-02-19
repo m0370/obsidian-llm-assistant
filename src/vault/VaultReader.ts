@@ -201,6 +201,13 @@ export class VaultReader {
 	 * ノートの内容を作成
 	 */
 	async createNote(path: string, content: string): Promise<TFile> {
+		const dir = path.substring(0, path.lastIndexOf("/"));
+		if (dir) {
+			const exists = await this.app.vault.adapter.exists(dir);
+			if (!exists) {
+				await this.app.vault.adapter.mkdir(dir);
+			}
+		}
 		return this.app.vault.create(path, content);
 	}
 
