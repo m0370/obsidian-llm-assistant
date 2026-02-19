@@ -4,6 +4,12 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.14] - 2026-02-19
+
+### Changed
+- Anthropic (Claude) now uses real SSE streaming via `fetch()` instead of chunked simulation via `requestUrl()` ([#52](https://github.com/m0370/obsidian-LLM/issues/52))
+- Deploy procedure updated to include `manifest.json` copy
+
 ## [0.4.13] - 2026-02-19
 
 ### Fixed
@@ -232,6 +238,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Obsidian LLM Assistantプラグインの全ての注目すべき変更点を記録します。
 
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいています。
+
+## [0.4.14] - 2026-02-19
+
+### 変更
+- Anthropic (Claude) のストリーミングを実SSE方式に変更 — `requestUrl()` 擬似描画から `fetch()` リアルタイムストリーミングへ ([#52](https://github.com/m0370/obsidian-LLM/issues/52))
+- デプロイ手順に `manifest.json` コピーを追加
 
 ## [0.4.13] - 2026-02-19
 
