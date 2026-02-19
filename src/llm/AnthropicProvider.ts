@@ -19,8 +19,8 @@ export class AnthropicProvider implements LLMProvider {
 
 	models: ModelInfo[] = [
 		{ id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 200000 },
-		{ id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", contextWindow: 200000 },
-		{ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", contextWindow: 200000 },
+		{ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 200000 },
+		{ id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200000 },
 	];
 
 	buildRequestBody(params: ChatRequest): Record<string, unknown> {

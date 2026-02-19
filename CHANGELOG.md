@@ -4,6 +4,13 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.12] - 2026-02-19
+
+### Added
+- eslint-plugin-obsidianmd integration for local Obsidian Review Bot-equivalent code scanning
+- `npm run lint` / `npm run lint:fix` scripts
+- Lint-pass required before build/deploy in CLAUDE.md workflow
+
 ## [0.4.11] - 2026-02-19
 
 ### Added
@@ -217,6 +224,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Obsidian LLM Assistantプラグインの全ての注目すべき変更点を記録します。
 
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいています。
+
+## [0.4.12] - 2026-02-19
+
+### 追加
+- eslint-plugin-obsidianmd 導入 — ObsidianReviewBotと同等のコードスキャンをローカルで実行可能に
+- `npm run lint` / `npm run lint:fix` スクリプト追加
+- CLAUDE.mdのデプロイ手順にlint通過を必須化
 
 ## [0.4.10] - 2026-02-19
 
