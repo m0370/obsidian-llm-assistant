@@ -24,6 +24,11 @@ export class ChatMessage {
 			cls: `llm-message llm-message-${this.data.role}`,
 		});
 
+		// 空コンテンツのアシスタントメッセージは非表示
+		if (this.data.role === "assistant" && !this.data.content) {
+			this.messageEl.addClass("is-hidden");
+		}
+
 		// メッセージヘッダー（ラベル + 編集ボタン）
 		const headerEl = this.messageEl.createDiv({ cls: "llm-message-header" });
 
@@ -64,10 +69,16 @@ export class ChatMessage {
 	updateContent(content: string): void {
 		this.data.content = content;
 		this.contentEl.textContent = content;
+		if (content) {
+			this.messageEl.removeClass("is-hidden");
+		}
 	}
 
 	appendContent(chunk: string): void {
 		this.data.content += chunk;
 		this.contentEl.textContent = this.data.content;
+		if (this.data.content) {
+			this.messageEl.removeClass("is-hidden");
+		}
 	}
 }
