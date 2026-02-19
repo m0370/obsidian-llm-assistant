@@ -4,6 +4,12 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.11] - 2026-02-19
+
+### Added
+- Vault Proximity Score: RAG search results are now boosted based on Vault structure (WikiLinks, folder distance, filename similarity, modification time) ([#46](https://github.com/m0370/obsidian-LLM/issues/46))
+- Settings UI for enabling/disabling Proximity Score and adjusting boost strength (0.0–1.0)
+
 ## [0.4.10] - 2026-02-19
 
 ### Added
@@ -34,7 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Stop and regenerate buttons for in-progress responses
 - Scroll-to-bottom button for long conversations
-- Three-tier keyboard handling architecture for improved mobile input
+- Three-tier keyboard handling: Capacitor Keyboard API for precise keyboard height detection, eliminating the gap between input field and keyboard on iOS ([#49](https://github.com/m0370/obsidian-LLM/issues/49))
 
 ## [0.4.6] - 2026-02-17
 
@@ -242,7 +248,7 @@ Obsidian LLM Assistantプラグインの全ての注目すべき変更点を記�
 ### 追加
 - 停止/再生成ボタンの追加
 - スクロールボタンの追加
-- キーボード対応の3層化アーキテクチャ
+- キーボード対応の3層化: Capacitor Keyboard APIで正確なキーボード高さ(px)を取得し、入力欄とキーボードの隙間を解消 ([#49](https://github.com/m0370/obsidian-LLM/issues/49))
 
 ## [0.4.6] - 2026-02-17
 
