@@ -12,7 +12,7 @@ export class AnthropicProvider implements LLMProvider {
 	id = "anthropic";
 	name = "Anthropic";
 	requiresApiKey = true;
-	supportsCORS = false; // CORSヘッダー非対応 → 常にrequestUrl()
+	supportsCORS = true; // anthropic-dangerous-direct-browser-access ヘッダーでCORS有効化
 	supportsToolUse = true;
 	apiEndpoint = "https://api.anthropic.com/v1/messages";
 	apiKeyUrl = "https://console.anthropic.com/settings/keys";
