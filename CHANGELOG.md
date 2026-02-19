@@ -4,6 +4,14 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.13] - 2026-02-19
+
+### Fixed
+- RAG index cache reliability: save cache after buildIndex/buildIndexFromCache completion, not only on destroy ([#26](https://github.com/m0370/obsidian-LLM/issues/26), [#32](https://github.com/m0370/obsidian-LLM/issues/32))
+- RAG startup performance: mtime-based fast check skips SHA-256 hash computation for unchanged files
+- Debounced auto-save (30s) after incremental file updates to prevent cache staleness
+- Cache version bumped to v2 (old v1 caches trigger automatic full rebuild)
+
 ## [0.4.12] - 2026-02-19
 
 ### Added
@@ -224,6 +232,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Obsidian LLM Assistantプラグインの全ての注目すべき変更点を記録します。
 
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいています。
+
+## [0.4.13] - 2026-02-19
+
+### 修正
+- RAGインデックスキャッシュの信頼性向上 — buildIndex/buildIndexFromCache完了後にも保存（destroy時のみだった問題を修正） ([#26](https://github.com/m0370/obsidian-LLM/issues/26), [#32](https://github.com/m0370/obsidian-LLM/issues/32))
+- RAG起動パフォーマンス改善 — mtime高速チェックで未変更ファイルのSHA-256ハッシュ計算をスキップ
+- 増分更新後の30秒デバウンス付き自動キャッシュ保存を追加
+- キャッシュバージョンをv2に更新（旧v1キャッシュは自動フル再構築）
 
 ## [0.4.12] - 2026-02-19
 
