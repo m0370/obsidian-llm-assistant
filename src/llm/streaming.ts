@@ -61,12 +61,12 @@ export async function sendRequest(
 		} catch (e) {
 			if (signal?.aborted) throw e;
 			// fetch()失敗（CSP制約・接続エラー等）→ requestUrl()一括受信にフォールバック
-			return completeWithRequestUrl(provider, params, trimmedKey, onToken);
+			return completeWithRequestUrl(provider, params, trimmedKey, onToken, signal);
 		}
 	}
 
 	// CORS非対応 or ストリーミング不要 → requestUrl()一括受信
-	return completeWithRequestUrl(provider, params, trimmedKey, onToken);
+	return completeWithRequestUrl(provider, params, trimmedKey, onToken, signal);
 }
 
 /**
@@ -187,6 +187,7 @@ async function completeWithRequestUrl(
 	params: ChatRequest,
 	apiKey: string,
 	onToken?: (token: string) => void,
+	signal?: AbortSignal,
 ): Promise<ChatResponse> {
 	const body = provider.buildRequestBody({ ...params, stream: false });
 	const headers = provider.buildHeaders(apiKey);
@@ -227,6 +228,7 @@ async function completeWithRequestUrl(
 				{ ...params, tools: undefined },
 				apiKey,
 				onToken,
+				signal,
 			);
 		}
 
@@ -245,7 +247,7 @@ async function completeWithRequestUrl(
 
 	// 段階描画: 受信テキストをチャンク分割して段階的に描画
 	if (onToken && result.content) {
-		await simulateStreaming(result.content, onToken);
+		await simulateStreaming(result.content, onToken, 50, 30, signal);
 	}
 
 	return result;
@@ -259,8 +261,10 @@ async function simulateStreaming(
 	onToken: (token: string) => void,
 	chunkSize = 50,
 	delayMs = 30,
+	signal?: AbortSignal,
 ): Promise<void> {
 	for (let i = 0; i < text.length; i += chunkSize) {
+		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 		const chunk = text.substring(i, i + chunkSize);
 		onToken(chunk);
 		if (i + chunkSize < text.length) {
