@@ -1132,29 +1132,34 @@ export class ChatView extends ItemView {
 
 		applyBtn.addEventListener("click", () => {
 			void (async () => {
-				await this.plugin.vaultReader.createNote(op.path, op.content);
-				new Notice(t("notice.fileCreated", { name: op.path }));
-				container.addClass("llm-edit-applied");
-				applyBtn.setAttribute("disabled", "true");
-				dismissBtn.addClass("is-hidden");
+				try {
+					await this.plugin.vaultReader.createNote(op.path, op.content);
+					new Notice(t("notice.fileCreated", { name: op.path }));
+					container.addClass("llm-edit-applied");
+					applyBtn.setAttribute("disabled", "true");
+					dismissBtn.addClass("is-hidden");
 
-				// Undoボタンを表示
-				const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
-				setIcon(undoBtn, "undo");
-				undoBtn.createSpan({ text: ` ${t("edit.undo")}` });
-				undoBtn.addEventListener("click", () => {
-					void (async () => {
-						const f = this.plugin.vaultReader.getFileByPath(op.path);
-						if (f) {
-							await this.app.fileManager.trashFile(f);
-							new Notice(t("notice.fileReverted", { name: op.path }));
-						}
-						container.removeClass("llm-edit-applied");
-						applyBtn.removeAttribute("disabled");
-						dismissBtn.removeClass("is-hidden");
-						undoBtn.remove();
-					})();
-				});
+					// Undoボタンを表示
+					const undoBtn = actions.createEl("button", { cls: "llm-edit-undo-btn" });
+					setIcon(undoBtn, "undo");
+					undoBtn.createSpan({ text: ` ${t("edit.undo")}` });
+					undoBtn.addEventListener("click", () => {
+						void (async () => {
+							const f = this.plugin.vaultReader.getFileByPath(op.path);
+							if (f) {
+								await this.app.fileManager.trashFile(f);
+								new Notice(t("notice.fileReverted", { name: op.path }));
+							}
+							container.removeClass("llm-edit-applied");
+							applyBtn.removeAttribute("disabled");
+							dismissBtn.removeClass("is-hidden");
+							undoBtn.remove();
+						})();
+					});
+				} catch (e) {
+					console.error("Failed to create file:", op.path, e);
+					new Notice(t("notice.fileCreateFailed", { name: op.path }));
+				}
 			})();
 		});
 

@@ -4,6 +4,13 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.16] - 2026-02-19
+
+### Fixed
+- New file creation via "Apply" button silently failed when parent folder didn't exist ([#54](https://github.com/m0370/obsidian-LLM/issues/54))
+- `VaultReader.createNote()` now recursively creates parent directories before file creation
+- Added try-catch and error notification to the apply button handler for new file proposals
+
 ## [0.4.15] - 2026-02-19
 
 ### Added

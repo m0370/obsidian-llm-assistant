@@ -202,6 +202,7 @@ const translations: Record<Locale, Record<string, string>> = {
 		"edit.matchNotFound": "Could not find matching text in file",
 		"notice.fileEdited": "{name} has been updated",
 		"notice.fileCreated": "{name} has been created",
+		"notice.fileCreateFailed": "Failed to create {name}",
 		"notice.fileReverted": "{name} has been reverted",
 
 		// Tool Use (Anthropic)
@@ -482,6 +483,7 @@ const translations: Record<Locale, Record<string, string>> = {
 		"edit.matchNotFound": "ファイル内に一致するテキストが見つかりません",
 		"notice.fileEdited": "{name} を更新しました",
 		"notice.fileCreated": "{name} を作成しました",
+		"notice.fileCreateFailed": "{name} の作成に失敗しました",
 		"notice.fileReverted": "{name} を元に戻しました",
 
 		// Tool Use (Anthropic)
