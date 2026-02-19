@@ -22,6 +22,7 @@ export interface SearchResult {
 	chunk: DocumentChunk;
 	score: number;           // 0-1
 	matchType: "text" | "semantic" | "hybrid";
+	proximityScore?: number; // Vault距離スコア（0-1）
 }
 
 export interface IndexStats {

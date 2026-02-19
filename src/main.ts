@@ -76,20 +76,20 @@ export default class LLMAssistantPlugin extends Plugin {
 					const deltaCount = await this.ragManager.buildIndexFromCache();
 
 					if (deltaCount === -1) {
-						// キャッシュなし or 設定変更 → フル再構築
+						// キャッシュなし or 設定変更 → フル再構築（起動時はサイレント）
 						await this.ragManager.buildIndex();
 						const stats = this.ragManager?.getStats();
 						if (stats) {
-							new Notice(t("notice.ragIndexComplete", { files: stats.indexedFiles, chunks: stats.totalChunks }));
+							console.log(`RAG index complete: ${stats.indexedFiles} files, ${stats.totalChunks} chunks`);
 						}
 					} else if (deltaCount > 0) {
-						// キャッシュ復元 + 差分更新あり
+						// キャッシュ復元 + 差分更新あり（起動時はサイレント）
 						const stats = this.ragManager?.getStats();
 						if (stats) {
-							new Notice(t("notice.ragIndexUpdated", { files: deltaCount, chunks: stats.totalChunks }));
+							console.log(`RAG index updated: ${deltaCount} files changed, ${stats.totalChunks} total chunks`);
 						}
 					}
-					// deltaCount === 0: 変更なし → Noticeなし（サイレント復元）
+					// deltaCount === 0: 変更なし → サイレント復元
 				})().catch((e) => console.warn("RAG auto-build failed:", e)); }, 2000); // 起動2秒後に開始
 			}
 		}
@@ -318,6 +318,15 @@ export default class LLMAssistantPlugin extends Plugin {
 			chunkMaxTokens: this.settings.ragChunkMaxTokens,
 			excludeFolders: this.settings.ragExcludeFolders,
 		});
+
+		// Vault距離スコア初期化
+		if (this.settings.ragProximityEnabled) {
+			this.ragManager.initializeProximity();
+			this.ragManager.updateSettings({
+				ragProximityEnabled: true,
+				ragProximityBoostFactor: this.settings.ragProximityBoostFactor,
+			});
+		}
 
 		// Vaultイベントリスナーを登録（自動増分更新）
 		this.registerEvent(

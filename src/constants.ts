@@ -32,6 +32,9 @@ export const DEFAULT_SETTINGS: LLMAssistantSettings = {
 	ragAutoIndex: false,
 	ragEmbeddingUseSharedKey: true,
 	ragEmbeddingCompactMode: false,
+	// Vault距離スコア
+	ragProximityEnabled: false,
+	ragProximityBoostFactor: 0.5,
 };
 
 export interface LLMAssistantSettings {
@@ -63,6 +66,9 @@ export interface LLMAssistantSettings {
 	ragAutoIndex: boolean;
 	ragEmbeddingUseSharedKey: boolean;
 	ragEmbeddingCompactMode: boolean;
+	// Vault距離スコア
+	ragProximityEnabled: boolean;
+	ragProximityBoostFactor: number;
 }
 
 export interface ProviderConfig {
@@ -200,7 +206,6 @@ export const PROVIDERS: ProviderConfig[] = [
 		models: [
 			{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000 },
 			{ id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000 },
-			{ id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", contextWindow: 1000000 },
 			{ id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", contextWindow: 1000000 },
 			{ id: "gemini-3-pro-preview", name: "Gemini 3 Pro (Preview)", contextWindow: 1000000 },
 		],

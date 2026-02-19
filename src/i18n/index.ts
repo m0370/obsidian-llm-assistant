@@ -280,6 +280,13 @@ const translations: Record<Locale, Record<string, string>> = {
 		"rag.contextHeader": "Relevant notes from vault (auto-retrieved by RAG):",
 		"rag.noResults": "No relevant notes found for: {query}",
 		"rag.toolSearchHeader": "Found {count} relevant sections for \"{query}\":",
+
+		// Vault Proximity Score
+		"settings.ragProximity": "Vault Proximity Score",
+		"settings.ragProximityEnabled": "Enable Vault Proximity Score",
+		"settings.ragProximityEnabledDesc": "Boost search results that are closer to the active note (by links, folder, filename, and time)",
+		"settings.ragProximityBoostFactor": "Boost strength",
+		"settings.ragProximityBoostFactorDesc": "How much to boost nearby results (0.0 = no boost, 1.0 = maximum boost)",
 	},
 
 	ja: {
@@ -550,6 +557,13 @@ const translations: Record<Locale, Record<string, string>> = {
 		"rag.contextHeader": "Vaultから自動検索された関連ノート（RAG）:",
 		"rag.noResults": "「{query}」に関連するノートが見つかりませんでした",
 		"rag.toolSearchHeader": "「{query}」に関連する{count}件のセクションが見つかりました:",
+
+		// Vault距離スコア
+		"settings.ragProximity": "Vault距離スコア",
+		"settings.ragProximityEnabled": "Vault距離スコアを有効化",
+		"settings.ragProximityEnabledDesc": "アクティブノートに近いファイル（リンク・フォルダ・ファイル名・更新日時）の検索順位を引き上げます",
+		"settings.ragProximityBoostFactor": "ブースト強度",
+		"settings.ragProximityBoostFactorDesc": "近接結果のブースト量 (0.0=なし, 1.0=最大)",
 	},
 };
 
