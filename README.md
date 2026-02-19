@@ -27,7 +27,7 @@ Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design
 | Provider | Example Models | API Key | Streaming | Notes |
 |:---|:---|:---:|:---:|:---|
 | **OpenAI** | GPT-5, GPT-5.2 | Required | Yes | |
-| **Anthropic** | Claude Opus 4.6, Sonnet 4.5, Haiku 4.5 | Required | Chunked | Uses requestUrl() due to CORS |
+| **Anthropic** | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | Required | Chunked | Uses requestUrl() due to CORS |
 | **Google Gemini** | Gemini 2.5 Flash/Pro | Required | Yes | |
 | **OpenRouter** | Claude, GPT, Llama, DeepSeek, etc. | Required | Yes | Unified access to multiple provider models |
 | **Ollama** | Llama 3.3, Gemma 3, Qwen 3 | Not required | Yes | Desktop only, local execution |
@@ -38,6 +38,8 @@ Chat with multiple LLMs (Claude, GPT, Gemini) in your vault. Mobile-first design
 - **Obsidian** v1.11.4 or later
 - **API key** for your chosen provider (except Ollama)
 - For Ollama: [Ollama](https://ollama.com/) installed on your desktop
+
+> **New to LLM APIs?** See the [Getting Started Guide](docs/getting-started.md) for step-by-step setup instructions. Google Gemini offers a free tier — no credit card required.
 
 ### Installation
 
@@ -286,7 +288,7 @@ LLM Assistantは以下の方針で設計されています:
 | プロバイダー | モデル例 | APIキー | ストリーミング | 備考 |
 |:---|:---|:---:|:---:|:---|
 | **OpenAI** | GPT-5, GPT-5.2 | 必要 | 対応 | |
-| **Anthropic** | Claude Opus 4.6, Sonnet 4.5, Haiku 4.5 | 必要 | 段階描画 | CORS非対応のためrequestUrl()使用 |
+| **Anthropic** | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | 必要 | 段階描画 | CORS非対応のためrequestUrl()使用 |
 | **Google Gemini** | Gemini 2.5 Flash/Pro | 必要 | 対応 | |
 | **OpenRouter** | Claude, GPT, Llama, DeepSeek等 | 必要 | 対応 | 複数プロバイダーのモデルを統合アクセス |
 | **Ollama** | Llama 3.3, Gemma 3, Qwen 3 等 | 不要 | 対応 | デスクトップ専用、ローカル実行 |
@@ -299,6 +301,8 @@ LLM Assistantは以下の方針で設計されています:
 - **Obsidian** v1.11.4 以上
 - 各プロバイダーの**APIキー**（Ollamaを除く）
 - Ollamaを使用する場合は、デスクトップ環境に[Ollama](https://ollama.com/)がインストールされていること
+
+> **LLMのAPIを使うのがはじめての方へ**: [はじめてのセットアップガイド](docs/getting-started.md) にステップごとの手順をまとめています。Google Gemini なら無料枠でお試しできます（クレジットカード不要）。
 
 ---
 
