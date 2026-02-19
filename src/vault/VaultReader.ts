@@ -205,7 +205,15 @@ export class VaultReader {
 		if (dir) {
 			const exists = await this.app.vault.adapter.exists(dir);
 			if (!exists) {
-				await this.app.vault.adapter.mkdir(dir);
+				// 多階層パス対応: 上位から順にディレクトリを作成
+				const parts = dir.split("/");
+				let current = "";
+				for (const part of parts) {
+					current = current ? current + "/" + part : part;
+					if (!(await this.app.vault.adapter.exists(current))) {
+						await this.app.vault.adapter.mkdir(current);
+					}
+				}
 			}
 		}
 		return this.app.vault.create(path, content);

@@ -1131,6 +1131,8 @@ export class ChatView extends ItemView {
 		dismissBtn.createSpan({ text: ` ${t("edit.dismiss")}` });
 
 		applyBtn.addEventListener("click", () => {
+			if (applyBtn.hasAttribute("disabled")) return;
+			applyBtn.setAttribute("disabled", "true");
 			void (async () => {
 				try {
 					await this.plugin.vaultReader.createNote(op.path, op.content);
@@ -1159,6 +1161,7 @@ export class ChatView extends ItemView {
 				} catch (e) {
 					console.error("Failed to create file:", op.path, e);
 					new Notice(t("notice.fileCreateFailed", { name: op.path }));
+					applyBtn.removeAttribute("disabled");
 				}
 			})();
 		});

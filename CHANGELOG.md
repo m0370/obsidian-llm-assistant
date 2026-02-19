@@ -4,6 +4,12 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.17] - 2026-02-19
+
+### Fixed
+- `VaultReader.createNote()` の多階層ディレクトリ作成を修正 — `a/b/c.md` のような深いパスで親フォルダが存在しない場合に上位から順に mkdir する
+- 新規ファイル「適用」ボタンの連打防止 — クリック直後に disabled 化し、失敗時のみ再有効化
+
 ## [0.4.16] - 2026-02-19
 
 ### Fixed
