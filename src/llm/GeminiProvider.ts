@@ -17,10 +17,11 @@ export class GeminiProvider implements LLMProvider {
 	apiKeyUrl = "https://aistudio.google.com/apikey";
 
 	models: ModelInfo[] = [
+		{ id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (Preview)", contextWindow: 1000000 },
+		{ id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite (Preview)", contextWindow: 1000000 },
+		{ id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", contextWindow: 1000000 },
 		{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000 },
 		{ id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000 },
-		{ id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", contextWindow: 1000000 },
-		{ id: "gemini-3-pro-preview", name: "Gemini 3 Pro (Preview)", contextWindow: 1000000 },
 	];
 
 	/**
@@ -158,7 +159,8 @@ export class GeminiProvider implements LLMProvider {
 
 		// 取得したい代表シリーズ（優先度順）
 		const wantedPrefixes = [
-			"gemini-3-pro",
+			"gemini-3.1-pro",
+			"gemini-3.1-flash",
 			"gemini-3-flash",
 			"gemini-2.5-pro",
 			"gemini-2.5-flash",

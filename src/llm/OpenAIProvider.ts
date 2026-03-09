@@ -11,13 +11,12 @@ export class OpenAIProvider implements LLMProvider {
 	apiKeyUrl = "https://platform.openai.com/api-keys";
 
 	models: ModelInfo[] = [
+		{ id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1000000 },
+		{ id: "gpt-5.4-pro", name: "GPT-5.4 Pro", contextWindow: 1000000 },
 		{ id: "gpt-5.2", name: "GPT-5.2", contextWindow: 400000 },
 		{ id: "gpt-5.1", name: "GPT-5.1", contextWindow: 400000 },
 		{ id: "gpt-5", name: "GPT-5", contextWindow: 400000 },
 		{ id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000 },
-		{ id: "gpt-4.1", name: "GPT-4.1", contextWindow: 1000000 },
-		{ id: "gpt-4.1-mini", name: "GPT-4.1 Mini", contextWindow: 1000000 },
-		{ id: "o3", name: "o3", contextWindow: 200000 },
 	];
 
 	buildRequestBody(params: ChatRequest): Record<string, unknown> {
@@ -139,17 +138,19 @@ export class OpenAIProvider implements LLMProvider {
 		});
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
+		// GPT-5系のみ表示（Gemini/Anthropicと同様に最新世代に限定）
+		const wantedPrefixes = ["gpt-5"];
+		// codex / chat-latest / image 等の特殊バリアントを除外
+		const excludePattern = /codex|chat-latest|image|nano|realtime|audio|search|transcribe|tts|dall-e|whisper/;
+
 		const data = response.json.data as Array<Record<string, unknown>>;
 		const allModels = data
 			.filter(m => {
 				const id = m.id as string;
-				if (!(id.startsWith("gpt-") || id.startsWith("o1") ||
-					id.startsWith("o3") || id.startsWith("o4") ||
-					id.startsWith("chatgpt-"))) return false;
+				if (!wantedPrefixes.some(p => id.startsWith(p))) return false;
+				if (excludePattern.test(id)) return false;
 				// 日付スナップショット(YYYY-MM-DD)を除外
 				if (/\d{4}-\d{2}-\d{2}/.test(id)) return false;
-				// 特殊バリアントを除外
-				if (/realtime|audio|search|transcribe|tts|dall-e|whisper/.test(id)) return false;
 				return true;
 			})
 			.map(m => ({
@@ -159,10 +160,9 @@ export class OpenAIProvider implements LLMProvider {
 			}))
 			.sort((a, b) => b.id.localeCompare(a.id));
 
-		// 同一シリーズの重複を除去（gpt-4oとgpt-4o-miniは別シリーズ）
+		// 同一シリーズの重複を除去（-previewなどのエイリアス）
 		const seen = new Set<string>();
 		return allModels.filter(m => {
-			// "gpt-4o-mini" → "gpt-4o-mini", "gpt-4o" → "gpt-4o", "o3" → "o3", "o3-mini" → "o3-mini"
 			const series = m.id.replace(/-preview$/, "");
 			if (seen.has(series)) return false;
 			seen.add(series);
