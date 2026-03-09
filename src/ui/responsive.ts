@@ -141,14 +141,14 @@ function setupCapacitorHandler(
 	const keyboard = window.Capacitor!.Plugins!.Keyboard!;
 
 	// keyboardWillShow: キーボードが表示されるタイミングで即座にリサイズ
-	keyboard.addListener("keyboardWillShow", (info) => {
+	void keyboard.addListener("keyboardWillShow", (info) => {
 		applyKeyboardHeight(info.keyboardHeight);
 	}).then(handle => {
 		listenerRemovers.push(() => handle.remove());
 	});
 
 	// keyboardDidShow: QuickTypeバーの遅延表示等で最終高さが変わる場合の補正
-	keyboard.addListener("keyboardDidShow", (info) => {
+	void keyboard.addListener("keyboardDidShow", (info) => {
 		if (info.keyboardHeight !== lastKbHeight) {
 			// 高さが変わった場合はレイアウトをリセットしてから再適用
 			if (isKeyboardOpen) {
@@ -163,14 +163,14 @@ function setupCapacitorHandler(
 	});
 
 	// keyboardWillHide: キーボード非表示開始
-	keyboard.addListener("keyboardWillHide", () => {
+	void keyboard.addListener("keyboardWillHide", () => {
 		restoreLayout();
 	}).then(handle => {
 		listenerRemovers.push(() => handle.remove());
 	});
 
 	// keyboardDidHide: キーボード非表示完了（安全ネット）
-	keyboard.addListener("keyboardDidHide", () => {
+	void keyboard.addListener("keyboardDidHide", () => {
 		restoreLayout();
 	}).then(handle => {
 		listenerRemovers.push(() => handle.remove());
