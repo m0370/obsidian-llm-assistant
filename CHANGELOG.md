@@ -4,6 +4,19 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.18] - 2026-03-09
+
+### Changed
+- デフォルトLLMモデルリストを最新版に更新
+  - OpenAI: GPT-5.4, GPT-5.4 Pro を追加（1Mコンテキスト）
+  - Gemini: Gemini 3.1 Pro Preview, Gemini 3.1 Flash Lite Preview を追加、廃止予定の Gemini 3 Pro Preview を削除
+  - OpenRouter: 上記新モデルを追加
+
+### Fixed
+- 「高度な設定」アコーディオンが内部の設定変更時に閉じてしまい画面最上段に飛ばされる問題を修正
+  - アコーディオン開閉状態をインスタンスプロパティで保持
+  - `display()` 再描画時のスクロール位置を保存・復元
+
 ## [0.4.17] - 2026-02-19
 
 ### Fixed
