@@ -9,6 +9,7 @@ import { isMobile } from "../utils/platform";
 
 export class LLMAssistantSettingTab extends PluginSettingTab {
 	plugin: LLMAssistantPlugin;
+	private advancedOpen = false;
 
 	constructor(app: App, plugin: LLMAssistantPlugin) {
 		super(app, plugin);
@@ -17,6 +18,10 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const { containerEl } = this;
+		// スクロール位置を保存（再描画時の復元用）
+		const scrollParent = containerEl.closest(".modal-content") ?? containerEl.parentElement;
+		const savedScrollTop = scrollParent?.scrollTop ?? 0;
+
 		containerEl.empty();
 
 		new Setting(containerEl).setName(t("settings.heading")).setHeading();
@@ -379,10 +384,23 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 		const advancedDetailsEl = containerEl.createEl("details", {
 			cls: "llm-settings-advanced-details",
 		});
+		if (this.advancedOpen) {
+			advancedDetailsEl.setAttribute("open", "");
+		}
+		advancedDetailsEl.addEventListener("toggle", () => {
+			this.advancedOpen = advancedDetailsEl.open;
+		});
 		advancedDetailsEl.createEl("summary", {
 			text: t("settings.advancedAccordion"),
 			cls: "llm-settings-advanced-summary",
 		});
+
+		// スクロール位置を復元（DOM構築後）
+		if (savedScrollTop > 0 && scrollParent) {
+			requestAnimationFrame(() => {
+				scrollParent.scrollTop = savedScrollTop;
+			});
+		}
 
 		// RAG設定
 		new Setting(advancedDetailsEl).setName(t("settings.rag")).setHeading();
