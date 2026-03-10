@@ -4,7 +4,7 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.4.18] - 2026-03-09
+## [0.4.18] - 2026-03-10
 
 ### Changed
 - ESLint設定を強化: `@typescript-eslint` ルール（no-floating-promises, no-unnecessary-type-assertion, require-await, no-misused-promises）を追加し、ObsidianReviewBotと同等のチェックをローカルで実行可能に
@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - OpenRouter: 上記新モデルを追加
 
 ### Fixed
+- RAGManager: `rebuildIndex` 時に unchanged ファイルの `fileHashes`/`fileMtimes` が復元されず次回も再処理される問題を修正
 - responsive.ts: Capacitor Keyboard listener登録のfloating promisesを`void`で修正（ObsidianReviewBot対策）
 - 「高度な設定」アコーディオンが内部の設定変更時に閉じてしまい画面最上段に飛ばされる問題を修正
   - アコーディオン開閉状態をインスタンスプロパティで保持

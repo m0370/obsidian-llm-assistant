@@ -489,6 +489,7 @@ export class RAGManager {
 			this.searchEngine.clear();
 			this.chunkMap.clear();
 			this.fileHashes.clear();
+			this.fileMtimes.clear();
 
 			if (unchangedChunks.length > 0) {
 				for (const chunk of unchangedChunks) {
@@ -497,6 +498,17 @@ export class RAGManager {
 				await this.searchEngine.addChunks(unchangedChunks, () =>
 					new Promise((resolve) => setTimeout(resolve, 0)),
 				);
+			}
+
+			// unchanged ファイルの fileHashes/fileMtimes を復元
+			const addedOrModifiedPaths = new Set(addedOrModified.map(f => f.path));
+			for (const [filePath, cached] of Object.entries(cache.files)) {
+				if (currentPaths.has(filePath) && !addedOrModifiedPaths.has(filePath)) {
+					this.fileHashes.set(filePath, cached.hash);
+					if (cached.mtime) {
+						this.fileMtimes.set(filePath, cached.mtime);
+					}
+				}
 			}
 
 			// 変更ファイルを処理
