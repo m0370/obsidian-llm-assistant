@@ -291,6 +291,16 @@ const translations: Record<Locale, Record<string, string>> = {
 		"settings.ragProximityEnabledDesc": "Boost search results that are closer to the active note (by links, folder, filename, and time)",
 		"settings.ragProximityBoostFactor": "Boost strength",
 		"settings.ragProximityBoostFactorDesc": "How much to boost nearby results (0.0 = no boost, 1.0 = maximum boost)",
+
+		// Context Scope
+		"scope.active": "Active",
+		"scope.local": "Local",
+		"scope.vault": "Vault",
+		"scope.vaultWarning": "Vault scope enabled — token usage will increase significantly",
+		"scope.linkedNotesOmitted": "(+{count} more linked notes not included — switch to Vault scope to search all notes)",
+		"settings.contextScope": "Context Scope",
+		"settings.defaultScope": "Default scope",
+		"settings.defaultScopeDesc": "Active: current note only (fastest). Local: + linked notes. Vault: full RAG search + file list",
 	},
 
 	ja: {
@@ -572,6 +582,16 @@ const translations: Record<Locale, Record<string, string>> = {
 		"settings.ragProximityEnabledDesc": "アクティブノートに近いファイル（リンク・フォルダ・ファイル名・更新日時）の検索順位を引き上げます",
 		"settings.ragProximityBoostFactor": "ブースト強度",
 		"settings.ragProximityBoostFactorDesc": "近接結果のブースト量 (0.0=なし, 1.0=最大)",
+
+		// コンテキストスコープ
+		"scope.active": "Active",
+		"scope.local": "Local",
+		"scope.vault": "Vault全体",
+		"scope.vaultWarning": "Vault全体スコープに切り替えました。トークン消費量が増大します",
+		"scope.linkedNotesOmitted": "（他に{count}件のリンク先ノートは省略 — Vault全体スコープに切り替えると全て検索できます）",
+		"settings.contextScope": "コンテキストスコープ",
+		"settings.defaultScope": "デフォルトスコープ",
+		"settings.defaultScopeDesc": "Active: 現在のノートのみ（最速）。Local: ＋リンク先ノート。Vault全体: RAG検索＋ファイル一覧",
 	},
 };
 
