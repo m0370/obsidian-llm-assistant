@@ -293,14 +293,14 @@ const translations: Record<Locale, Record<string, string>> = {
 		"settings.ragProximityBoostFactorDesc": "How much to boost nearby results (0.0 = no boost, 1.0 = maximum boost)",
 
 		// Context Scope
-		"scope.active": "Active",
-		"scope.local": "Local",
+		"scope.active": "This Page",
+		"scope.local": "Linked Pages",
 		"scope.vault": "Vault",
 		"scope.vaultWarning": "Vault scope enabled — token usage will increase significantly",
 		"scope.linkedNotesOmitted": "(+{count} more linked notes not included — switch to Vault scope to search all notes)",
 		"settings.contextScope": "Context Scope",
 		"settings.defaultScope": "Default scope",
-		"settings.defaultScopeDesc": "Active: current note only (fastest). Local: + linked notes. Vault: full RAG search + file list",
+		"settings.defaultScopeDesc": "This Page: current note only (fastest). Linked Pages: + linked notes. Vault: full RAG search + file list",
 	},
 
 	ja: {
@@ -584,14 +584,14 @@ const translations: Record<Locale, Record<string, string>> = {
 		"settings.ragProximityBoostFactorDesc": "近接結果のブースト量 (0.0=なし, 1.0=最大)",
 
 		// コンテキストスコープ
-		"scope.active": "Active",
-		"scope.local": "Local",
+		"scope.active": "このページ",
+		"scope.local": "隣接ページ",
 		"scope.vault": "Vault全体",
 		"scope.vaultWarning": "Vault全体スコープに切り替えました。トークン消費量が増大します",
 		"scope.linkedNotesOmitted": "（他に{count}件のリンク先ノートは省略 — Vault全体スコープに切り替えると全て検索できます）",
 		"settings.contextScope": "コンテキストスコープ",
 		"settings.defaultScope": "デフォルトスコープ",
-		"settings.defaultScopeDesc": "Active: 現在のノートのみ（最速）。Local: ＋リンク先ノート。Vault全体: RAG検索＋ファイル一覧",
+		"settings.defaultScopeDesc": "このページ: 現在のノートのみ（最速）。隣接ページ: ＋リンク先ノート。Vault全体: RAG検索＋ファイル一覧",
 	},
 };
 
