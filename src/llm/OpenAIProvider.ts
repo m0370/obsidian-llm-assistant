@@ -11,12 +11,14 @@ export class OpenAIProvider implements LLMProvider {
 	apiKeyUrl = "https://platform.openai.com/api-keys";
 
 	models: ModelInfo[] = [
-		{ id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1000000 },
-		{ id: "gpt-5.4-pro", name: "GPT-5.4 Pro", contextWindow: 1000000 },
+		{ id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1050000 },
+		{ id: "gpt-5.4-pro", name: "GPT-5.4 Pro", contextWindow: 1050000 },
+		{ id: "gpt-5.4-mini", name: "GPT-5.4 Mini", contextWindow: 400000 },
+		{ id: "gpt-5.4-nano", name: "GPT-5.4 Nano", contextWindow: 400000 },
 		{ id: "gpt-5.2", name: "GPT-5.2", contextWindow: 400000 },
-		{ id: "gpt-5.1", name: "GPT-5.1", contextWindow: 400000 },
 		{ id: "gpt-5", name: "GPT-5", contextWindow: 400000 },
 		{ id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000 },
+		{ id: "gpt-5-nano", name: "GPT-5 Nano", contextWindow: 400000 },
 	];
 
 	buildRequestBody(params: ChatRequest): Record<string, unknown> {
@@ -143,7 +145,7 @@ export class OpenAIProvider implements LLMProvider {
 		// GPT-5系のみ表示（Gemini/Anthropicと同様に最新世代に限定）
 		const wantedPrefixes = ["gpt-5"];
 		// codex / chat-latest / image 等の特殊バリアントを除外
-		const excludePattern = /codex|chat-latest|image|nano|realtime|audio|search|transcribe|tts|dall-e|whisper/;
+		const excludePattern = /codex|chat-latest|image|realtime|audio|search|transcribe|tts|dall-e|whisper/;
 
 		const data = response.json.data as Array<Record<string, unknown>>;
 		const allModels = data
