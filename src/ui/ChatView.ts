@@ -1,4 +1,4 @@
-import { ItemView, MarkdownRenderer, MarkdownView, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, MarkdownRenderer, MarkdownView, Menu, Notice, WorkspaceLeaf, setIcon, TFile } from "obsidian";
 import "../obsidian.d";
 import { VIEW_TYPE_CHAT, DISPLAY_NAME } from "../constants";
 import type LLMAssistantPlugin from "../main";
@@ -12,6 +12,7 @@ import { ChatInput } from "./ChatInput";
 import { ChatMessage, type MessageData } from "./ChatMessage";
 import { setupMobileViewportHandler } from "./responsive";
 import { t } from "../i18n";
+import { estimateTokens } from "../utils/TokenCounter";
 
 /** Anthropic Tool Use API 用のツール定義 */
 const VAULT_TOOLS: ToolDefinition[] = [
@@ -117,6 +118,8 @@ export class ChatView extends ItemView {
 	private abortController: AbortController | null = null;
 	private regenerateBtn: HTMLElement | null = null;
 	private welcomeEl: HTMLElement | null = null;
+	private currentScope: "active" | "local" | "vault" = "active";
+	private scopeButtons: Map<"active" | "local" | "vault", HTMLButtonElement> = new Map();
 
 	constructor(leaf: WorkspaceLeaf, plugin: LLMAssistantPlugin) {
 		super(leaf);
@@ -144,6 +147,7 @@ export class ChatView extends ItemView {
 		// 初期化
 		this.noteContext = new NoteContext(this.plugin.vaultReader);
 		this.conversationManager = new ConversationManager(this.app);
+		this.currentScope = this.plugin.settings.contextScope ?? "active";
 
 		// ヘッダー
 		this.headerEl = container.createDiv({ cls: "llm-header" });
@@ -186,6 +190,9 @@ export class ChatView extends ItemView {
 
 		// コンテキストバー（添付ノート表示）
 		this.contextBar = bottomArea.createDiv({ cls: "llm-context-bar is-hidden" });
+
+		// スコープバー（コンテキストバーと入力エリアの間）
+		this.buildScopeBar(bottomArea);
 
 		// 入力エリア（textarea + Sendボタンが1行に統合）
 		const inputContainer = bottomArea.createDiv({ cls: "llm-chat-input-container" });
@@ -244,6 +251,39 @@ export class ChatView extends ItemView {
 		menuBtn.addEventListener("click", (evt) => {
 			this.showPlusMenu(evt);
 		});
+	}
+
+	private buildScopeBar(container: HTMLElement): void {
+		const scopeBar = container.createDiv({ cls: "llm-scope-bar" });
+		const scopes: Array<"active" | "local" | "vault"> = ["active", "local", "vault"];
+
+		for (const scope of scopes) {
+			const btn = scopeBar.createEl("button", {
+				cls: "llm-scope-btn" + (this.currentScope === scope ? " is-active" : ""),
+				text: t(`scope.${scope}`),
+				attr: { "aria-label": t(`scope.${scope}`) },
+			});
+			this.scopeButtons.set(scope, btn);
+			btn.addEventListener("click", () => {
+				this.setScope(scope);
+			});
+		}
+	}
+
+	private setScope(scope: "active" | "local" | "vault"): void {
+		if (this.currentScope === scope) return;
+		const wasVault = this.currentScope === "vault";
+		this.currentScope = scope;
+
+		// ボタン状態更新
+		for (const [s, btn] of this.scopeButtons) {
+			btn.toggleClass("is-active", s === scope);
+		}
+
+		// Vault切替時のみ警告
+		if (scope === "vault" && !wasVault) {
+			new Notice(t("scope.vaultWarning"));
+		}
 	}
 
 	/** 設定画面からのモデルリスト更新時に呼ばれる */
@@ -610,9 +650,11 @@ export class ChatView extends ItemView {
 
 	/**
 	 * システムプロンプトを構築（コンテキスト、アクティブノート、wikilink、Vault一覧を含む）
+	 * スコープ: active（現在のノートのみ）/ local（+一次リンク先）/ vault（Vault全体）
 	 */
 	private async buildSystemPrompt(userText: string, provider?: LLMProvider): Promise<string> {
 		const parts: string[] = [];
+		const scope = this.currentScope;
 
 		// 1. ユーザーのカスタムシステムプロンプト
 		if (this.plugin.settings.systemPrompt) {
@@ -623,7 +665,6 @@ export class ChatView extends ItemView {
 		if (provider?.supportsToolUse) {
 			parts.push(t("context.toolUseInstruction"));
 			// Dataview未インストール時の案内
-
 			const hasDataview = !!(this.app as any).plugins?.plugins?.["dataview"]?.api;
 			if (!hasDataview) {
 				parts.push(t("context.dataviewSuggestion"));
@@ -633,9 +674,9 @@ export class ChatView extends ItemView {
 			parts.push(t("context.vaultWriteInstruction"));
 		}
 
-		// 3. Vault全体のファイル一覧（コンパクト化: 最大200件）
+		// 3. Vault全体のファイル一覧（Vault全体スコープのみ）
 		// RAG有効 & インデックス構築済みの場合はスキップ（RAG検索で代替）
-		if (!this.plugin.ragManager?.isBuilt()) {
+		if (scope === "vault" && !this.plugin.ragManager?.isBuilt()) {
 			const vaultFiles = this.plugin.vaultReader.getVaultFileList(200);
 			if (vaultFiles.length > 0) {
 				const fileList = vaultFiles.join("\n");
@@ -666,6 +707,36 @@ export class ChatView extends ItemView {
 			}
 		}
 
+		// 5b. Localスコープ: 一次リンク先ノートを追加（最大5件, 20Kトークン上限）
+		if (scope === "local" && activeFile) {
+			const localActiveFile = activeFile;
+			const linkedFileNames = this.plugin.vaultReader.getFileLinks(localActiveFile);
+			const resolvedLinked: TFile[] = linkedFileNames
+				.map((name) => this.plugin.vaultReader.resolveWikiLink(name, localActiveFile.path))
+				.filter((f): f is TFile => f !== null)
+				.sort((a, b) => b.stat.mtime - a.stat.mtime);
+
+			const MAX_LINKED = 5;
+			let tokenBudget = 20000;
+			let included = 0;
+			for (const linkedFile of resolvedLinked) {
+				if (included >= MAX_LINKED || tokenBudget <= 0) break;
+				const alreadyInContext = this.noteContext.getEntries().some(e => e.file.path === linkedFile.path);
+				const isActiveFile = activeFile && activeFile.path === linkedFile.path;
+				if (alreadyInContext || isActiveFile) continue;
+				const content = await this.plugin.vaultReader.cachedReadFile(linkedFile);
+				const tokens = estimateTokens(content);
+				if (tokens > tokenBudget) continue;
+				tokenBudget -= tokens;
+				parts.push(`--- ${linkedFile.basename} (${linkedFile.path}) ---\n${content}`);
+				included++;
+			}
+			const remaining = resolvedLinked.length - included;
+			if (remaining > 0) {
+				parts.push(t("scope.linkedNotesOmitted", { count: remaining }));
+			}
+		}
+
 		// 6. ユーザーメッセージ中の[[wikilink]]を検出し、ファイル内容を自動取得
 		const linkedFiles = await this.plugin.vaultReader.resolveWikiLinksInText(userText);
 		for (const linked of linkedFiles) {
@@ -676,8 +747,8 @@ export class ChatView extends ItemView {
 			}
 		}
 
-		// 7. RAG自動検索結果を注入（有効かつインデックス構築済みの場合）
-		if (this.plugin.ragManager?.isBuilt()) {
+		// 7. RAG自動検索結果を注入（Vault全体スコープのみ、かつインデックス構築済みの場合）
+		if (scope === "vault" && this.plugin.ragManager?.isBuilt()) {
 			const embeddingApiKey = await this.getEmbeddingApiKey();
 			const ragResults = await this.plugin.ragManager.search(userText, undefined, undefined, embeddingApiKey);
 			if (ragResults.length > 0) {
@@ -800,14 +871,16 @@ export class ChatView extends ItemView {
 				messageComponent.updateContent(t("chat.readingFiles"));
 			}
 
-			// ツール配列を構築（vault_list常時 + vault_search/dataview_query条件付き）
-
+			// ツール配列を構築（スコープに応じて制限）
+			// Active/Local: vault_read + vault_write のみ（探索ツールは除外）
+			// Vault全体: vault_list + vault_search + dataview_query も追加
 			const hasDataview = !!(this.app as any).plugins?.plugins?.["dataview"]?.api;
+			const isVaultScope = this.currentScope === "vault";
 			const tools = [
 				...VAULT_TOOLS,
-				VAULT_LIST_TOOL,
-				...(this.plugin.ragManager?.isBuilt() ? [VAULT_SEARCH_TOOL] : []),
-				...(hasDataview ? [DATAVIEW_QUERY_TOOL] : []),
+				...(isVaultScope ? [VAULT_LIST_TOOL] : []),
+				...(isVaultScope && this.plugin.ragManager?.isBuilt() ? [VAULT_SEARCH_TOOL] : []),
+				...(isVaultScope && hasDataview ? [DATAVIEW_QUERY_TOOL] : []),
 			];
 
 			const response = await sendRequest(
@@ -1570,6 +1643,7 @@ export class ChatView extends ItemView {
 			model: this.plugin.settings.activeModel,
 			createdAt: this.messages[0]?.timestamp || now,
 			updatedAt: now,
+			scope: this.currentScope,
 		};
 
 		await this.conversationManager.save(conversation);
@@ -1579,6 +1653,10 @@ export class ChatView extends ItemView {
 		this.clearChat();
 		this.currentConversationId = conversation.id;
 		this.messages = [...conversation.messages];
+
+		// スコープを復元（未保存の古い会話は設定のデフォルトを使用）
+		const savedScope = conversation.scope ?? this.plugin.settings.contextScope ?? "active";
+		this.setScope(savedScope);
 
 		// メッセージを順番にレンダリング
 		for (let i = 0; i < this.messages.length; i++) {
@@ -1601,5 +1679,8 @@ export class ChatView extends ItemView {
 		this.chatOutput.empty();
 		this.noteContext.clear();
 		this.updateContextBar();
+		// 新規チャット時はデフォルトスコープに戻す
+		this.setScope(this.plugin.settings.contextScope ?? "active");
+		this.showWelcome();
 	}
 }

@@ -10,6 +10,7 @@ export interface Conversation {
 	model: string;
 	createdAt: number;
 	updatedAt: number;
+	scope?: "active" | "local" | "vault";
 }
 
 interface ConversationIndex {

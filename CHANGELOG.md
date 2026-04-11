@@ -4,6 +4,19 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.19] - 2026-04-11
+
+### Added
+- コンテキストスコープ切り替え機能を追加（Active / Local / Vault全体の3段階）
+  - **Active**（デフォルト）: 現在開いているノートのみ送信。最速・最小トークン消費
+  - **Local**: アクティブノート + 一次リンク先ノート（最大5件、20Kトークン上限）
+  - **Vault全体**: 従来通り、RAG検索・ファイル一覧・全ツール利用可能
+- チャット入力エリア上部にスコープバー（`[Active] [Local] [Vault全体]`）を追加
+- Vault全体スコープ選択時に「トークン消費量が増大します」の警告Noticeを表示
+- Active/Localスコープ時はvault_list/vault_search/dataview_queryツールを除外（探索ツールの誤動作防止）
+- 設定画面にデフォルトスコープのドロップダウンを追加
+- 会話ごとにスコープを保存・復元（会話履歴読み込み時にスコープも再現）
+
 ## [0.4.18] - 2026-03-10
 
 ### Changed
