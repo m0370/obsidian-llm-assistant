@@ -380,6 +380,23 @@ export class LLMAssistantSettingTab extends PluginSettingTab {
 				});
 			});
 
+		// コンテキストスコープ設定
+		new Setting(containerEl).setName(t("settings.contextScope")).setHeading();
+
+		new Setting(containerEl)
+			.setName(t("settings.defaultScope"))
+			.setDesc(t("settings.defaultScopeDesc"))
+			.addDropdown((dropdown) => {
+				dropdown.addOption("active", t("scope.active"));
+				dropdown.addOption("local", t("scope.local"));
+				dropdown.addOption("vault", t("scope.vault"));
+				dropdown.setValue(this.plugin.settings.contextScope ?? "active");
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.contextScope = value as "active" | "local" | "vault";
+					await this.plugin.saveSettings();
+				});
+			});
+
 		// 「高度な設定」アコーディオン（RAG / Embedding）
 		const advancedDetailsEl = containerEl.createEl("details", {
 			cls: "llm-settings-advanced-details",

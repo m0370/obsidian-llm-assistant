@@ -35,6 +35,8 @@ export const DEFAULT_SETTINGS: LLMAssistantSettings = {
 	// Vault距離スコア
 	ragProximityEnabled: false,
 	ragProximityBoostFactor: 0.5,
+	// コンテキストスコープ
+	contextScope: "active" as "active" | "local" | "vault",
 };
 
 export interface LLMAssistantSettings {
@@ -69,6 +71,8 @@ export interface LLMAssistantSettings {
 	// Vault距離スコア
 	ragProximityEnabled: boolean;
 	ragProximityBoostFactor: number;
+	// コンテキストスコープ
+	contextScope: "active" | "local" | "vault";
 }
 
 export interface ProviderConfig {
