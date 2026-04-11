@@ -4,6 +4,13 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.20] - 2026-04-11
+
+### Fixed
+- OpenAI新モデル（o1/o3/o4系、GPT-5系）で `max_tokens` が非対応のエラーを修正
+  - 対象モデルでは `max_completion_tokens` を使用するよう切り替え
+  - 同モデルで非対応の `temperature` パラメータも除外
+
 ## [0.4.19] - 2026-04-11
 
 ### Added

@@ -52,11 +52,13 @@ export class OpenAIProvider implements LLMProvider {
 			}));
 		}
 
-		if (params.temperature !== undefined) {
+		// o1/o3/o4系とgpt-5系は max_completion_tokens を使用、temperature非対応
+		const isReasoningOrGpt5 = /^(o[1-9]|gpt-5)/i.test(params.model);
+		if (params.temperature !== undefined && !isReasoningOrGpt5) {
 			body.temperature = params.temperature;
 		}
 		if (params.maxTokens !== undefined) {
-			body.max_tokens = params.maxTokens;
+			body[isReasoningOrGpt5 ? "max_completion_tokens" : "max_tokens"] = params.maxTokens;
 		}
 		if (params.stream) {
 			body.stream = true;
