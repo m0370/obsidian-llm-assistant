@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.4.20] - 2026-04-11
 
+### Added
+- OpenAIモデルリストを最新化
+  - `gpt-5.4-mini`（400k context）、`gpt-5.4-nano`（400k context）、`gpt-5-nano` を追加
+  - `gpt-5.4` / `gpt-5.4-pro` のコンテキストウィンドウを1,050,000に更新
+  - `gpt-5.1`（2026年3月退役）を削除
+  - fetchModels の除外パターンから `nano` を削除（正規モデルとして追加されたため）
+- Geminiモデルリストを最新化
+  - `gemini-3-pro-preview` を追加
+- Claudeモデルリスト（opus-4-6, sonnet-4-6, haiku-4-5）は最新のため変更なし
+
 ### Fixed
 - OpenAI新モデル（o1/o3/o4系、GPT-5系）で `max_tokens` が非対応のエラーを修正
   - 対象モデルでは `max_completion_tokens` を使用するよう切り替え
