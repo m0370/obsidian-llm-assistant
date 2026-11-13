@@ -17,12 +17,12 @@ export class GeminiProvider implements LLMProvider {
 	apiKeyUrl = "https://aistudio.google.com/apikey";
 
 	models: ModelInfo[] = [
-		{ id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (Preview)", contextWindow: 1000000 },
-		{ id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite (Preview)", contextWindow: 1000000 },
-		{ id: "gemini-3-pro-preview", name: "Gemini 3 Pro (Preview)", contextWindow: 1000000 },
-		{ id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", contextWindow: 1000000 },
-		{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000 },
-		{ id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000 },
+		{ id: "gemini-4-carbon", name: "Gemini 4 Carbon", contextWindow: 1048576 },
+		{ id: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen", contextWindow: 1048576 },
+		{ id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", contextWindow: 1048576 },
+		{ id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", contextWindow: 1048576 },
+		{ id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite", contextWindow: 1048576 },
+		{ id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (Preview)", contextWindow: 1048576 },
 	];
 
 	/**
@@ -160,11 +160,11 @@ export class GeminiProvider implements LLMProvider {
 
 		// 取得したい代表シリーズ（優先度順）
 		const wantedPrefixes = [
+			"gemini-4-carbon",
+			"gemini-4-hydrogen",
+			"gemini-3.8-flash",
+			"gemini-3.6-flash",
 			"gemini-3.1-pro",
-			"gemini-3.1-flash",
-			"gemini-3-flash",
-			"gemini-2.5-pro",
-			"gemini-2.5-flash",
 		];
 
 		const allModels = (response.json.models as Array<Record<string, unknown>>)

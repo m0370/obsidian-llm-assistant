@@ -15,16 +15,14 @@ export class OpenRouterProvider implements LLMProvider {
 	apiKeyUrl = "https://openrouter.ai/keys";
 
 	models: ModelInfo[] = [
-		{ id: "anthropic/claude-opus-4.6", name: "Claude Opus 4.6 (via OR)", contextWindow: 200000 },
-		{ id: "anthropic/claude-sonnet-4.6", name: "Claude Sonnet 4.6 (via OR)", contextWindow: 200000 },
-		{ id: "anthropic/claude-haiku-4.5", name: "Claude Haiku 4.5 (via OR)", contextWindow: 200000 },
-		{ id: "openai/gpt-5.4", name: "GPT-5.4 (via OR)", contextWindow: 1000000 },
-		{ id: "openai/gpt-5.4-pro", name: "GPT-5.4 Pro (via OR)", contextWindow: 1000000 },
-		{ id: "openai/gpt-5.2", name: "GPT-5.2 (via OR)", contextWindow: 400000 },
-		{ id: "openai/gpt-5", name: "GPT-5 (via OR)", contextWindow: 400000 },
-		{ id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via OR)", contextWindow: 1000000 },
-		{ id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash (via OR)", contextWindow: 1000000 },
-		{ id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via OR)", contextWindow: 1000000 },
+		{ id: "anthropic/claude-fable-5.2", name: "Claude Fable 5.2 (via OR)", contextWindow: 1000000 },
+		{ id: "anthropic/claude-opus-5.5", name: "Claude Opus 5.5 (via OR)", contextWindow: 1000000 },
+		{ id: "anthropic/claude-sonnet-5.5", name: "Claude Sonnet 5.5 (via OR)", contextWindow: 1000000 },
+		{ id: "anthropic/claude-haiku-5.5", name: "Claude Haiku 5.5 (via OR)", contextWindow: 1000000 },
+		{ id: "openai/gpt-6.1-sol", name: "GPT-6.1 Sol (via OR)", contextWindow: 1050000 },
+		{ id: "openai/gpt-5.5", name: "GPT-5.5 (via OR)", contextWindow: 1050000 },
+		{ id: "google/gemini-4-carbon", name: "Gemini 4 Carbon (via OR)", contextWindow: 1048576 },
+		{ id: "google/gemini-3.8-flash", name: "Gemini 3.8 Flash (via OR)", contextWindow: 1048576 },
 		{ id: "meta-llama/llama-4-scout", name: "Llama 4 Scout (via OR)", contextWindow: 512000 },
 		{ id: "deepseek/deepseek-r1", name: "DeepSeek R1 (via OR)", contextWindow: 163840 },
 	];
@@ -150,15 +148,16 @@ export class OpenRouterProvider implements LLMProvider {
 
 		// 取得したいシリーズ（優先度順）— 各シリーズから最新1つだけ選出
 		const wantedPrefixes = [
+			"anthropic/claude-fable",
 			"anthropic/claude-opus",
 			"anthropic/claude-sonnet",
 			"anthropic/claude-haiku",
+			"openai/gpt-6",
 			"openai/gpt-5",
+			"google/gemini-4-carbon",
+			"google/gemini-4-hydrogen",
+			"google/gemini-3.8-flash",
 			"google/gemini-3.1-pro",
-			"google/gemini-3-pro",
-			"google/gemini-3-flash",
-			"google/gemini-2.5-pro",
-			"google/gemini-2.5-flash",
 			"meta-llama/llama-4",
 			"deepseek/deepseek-r1",
 			"qwen/qwen3",

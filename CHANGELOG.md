@@ -4,6 +4,16 @@ All notable changes to the Obsidian LLM Assistant plugin will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.21] - 2026-11-13
+
+### Changed
+- 全プロバイダーのモデルリストを各社公式ドキュメントに合わせて更新
+  - Anthropic: `claude-fable-5-2` / `claude-opus-5-5` / `claude-sonnet-5-5` / `claude-haiku-5-5`（コンテキスト1M）。Fable ティアも動的取得の対象に追加
+  - OpenAI: `gpt-6-astra` / `gpt-6.1-sol` / `gpt-6.1-terra` / `gpt-6-luna` / `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini`。退役予定の gpt-5 / gpt-5-mini / gpt-5.1 / gpt-4.1 / o3 を削除。GPT-6 系も `max_completion_tokens` を使用
+  - Gemini: `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-3.8-flash` / `gemini-3.6-flash` / `gemini-3.5-flash-lite` / `gemini-3.1-pro-preview`。2026-12-01 に振替される 2.5 系を削除
+  - OpenRouter: 上記に対応する Claude 5.x / GPT-6.1 / Gemini 4・3.8 を追加
+- 既定モデルを `gemini-3.8-flash` に変更（新規インストール時のみ。既存の設定は維持）
+
 ## [0.4.20] - 2026-04-11
 
 ### Added

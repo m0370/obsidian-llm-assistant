@@ -11,14 +11,13 @@ export class OpenAIProvider implements LLMProvider {
 	apiKeyUrl = "https://platform.openai.com/api-keys";
 
 	models: ModelInfo[] = [
+		{ id: "gpt-6-astra", name: "GPT-6 Astra", contextWindow: 1050000 },
+		{ id: "gpt-6.1-sol", name: "GPT-6.1 Sol", contextWindow: 1050000 },
+		{ id: "gpt-6.1-terra", name: "GPT-6.1 Terra", contextWindow: 1050000 },
+		{ id: "gpt-6-luna", name: "GPT-6 Luna", contextWindow: 1050000 },
+		{ id: "gpt-5.5", name: "GPT-5.5", contextWindow: 1050000 },
 		{ id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1050000 },
-		{ id: "gpt-5.4-pro", name: "GPT-5.4 Pro", contextWindow: 1050000 },
 		{ id: "gpt-5.4-mini", name: "GPT-5.4 Mini", contextWindow: 400000 },
-		{ id: "gpt-5.4-nano", name: "GPT-5.4 Nano", contextWindow: 400000 },
-		{ id: "gpt-5.2", name: "GPT-5.2", contextWindow: 400000 },
-		{ id: "gpt-5", name: "GPT-5", contextWindow: 400000 },
-		{ id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000 },
-		{ id: "gpt-5-nano", name: "GPT-5 Nano", contextWindow: 400000 },
 	];
 
 	buildRequestBody(params: ChatRequest): Record<string, unknown> {
@@ -55,7 +54,7 @@ export class OpenAIProvider implements LLMProvider {
 		}
 
 		// o1/o3/o4系とgpt-5系は max_completion_tokens を使用、temperature非対応
-		const isReasoningOrGpt5 = /^(o[1-9]|gpt-5)/i.test(params.model);
+		const isReasoningOrGpt5 = /^(o[1-9]|gpt-[56])/i.test(params.model);
 		if (params.temperature !== undefined && !isReasoningOrGpt5) {
 			body.temperature = params.temperature;
 		}
@@ -142,8 +141,8 @@ export class OpenAIProvider implements LLMProvider {
 		});
 		if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 
-		// GPT-5系のみ表示（Gemini/Anthropicと同様に最新世代に限定）
-		const wantedPrefixes = ["gpt-5"];
+		// GPT-6/5系のみ表示（Gemini/Anthropicと同様に最新世代に限定）
+		const wantedPrefixes = ["gpt-6", "gpt-5"];
 		// codex / chat-latest / image 等の特殊バリアントを除外
 		const excludePattern = /codex|chat-latest|image|realtime|audio|search|transcribe|tts|dall-e|whisper/;
 
